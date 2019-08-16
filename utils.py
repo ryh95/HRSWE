@@ -96,7 +96,7 @@ def get_words_vecs_from_word_sim(tasks,emb_dict):
     return words, words_vecs
 
 
-def DAWE(beta, emb,adj_pos,adj_neg,config):
+def DAWE(beta1,beta2,emb,adj_pos,adj_neg,config):
     """
     Dynamic Adjusted Word Embedding
 
@@ -113,7 +113,7 @@ def DAWE(beta, emb,adj_pos,adj_neg,config):
     d,n = emb.shape
     W = emb.T @ emb
 
-    W_prime = W + beta * adj_pos.multiply(np.max(W) - W) + beta * adj_neg.multiply(W - np.min(W))
+    W_prime = W + beta1 * adj_pos.multiply(np.max(W) - W) + beta2 * adj_neg.multiply(W - np.min(W))
 
     if config['sim_mat_type'] == 'pd':
         W_hat = nearestPD(W_prime)
@@ -121,6 +121,7 @@ def DAWE(beta, emb,adj_pos,adj_neg,config):
         W_hat = W_prime
 
     if config['eig_vec_option'] == 'ld':
+        # choose d largest eigenvectors
         # ref: https://stackoverflow.com/a/12168664
         lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
 
@@ -129,9 +130,9 @@ def DAWE(beta, emb,adj_pos,adj_neg,config):
     elif config['emb_type'] == 1: # together use with n
         row_norm = np.linalg.norm(Q_s,axis=1)[:,np.newaxis]
         new_emb = Q_s / row_norm
-    elif config['emb_type'] == 2: # together use with n
-        assert np.all(lamb_s) >= 0
-        new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
+    # elif config['emb_type'] == 2: # together use with n
+    #     assert np.all(lamb_s) >= 0
+    #     new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
     return new_emb.T
 
 

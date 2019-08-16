@@ -35,33 +35,35 @@ def get_all_words_in_constraint(word_sim_fname):
             vocab.update(word_pair)
     return vocab
 
-def create_test_emb_on_word_sim_tasks(words,words_vecs,sim_tasks,betas,
+def create_test_emb_on_word_sim_tasks(words,words_vecs,sim_tasks,beta1s,beta2s,
                                       thesauri,sim_type,eigen_vec_option,emb_type):
 
     config = {'sim_mat_type': sim_type, 'eig_vec_option': eigen_vec_option, 'emb_type': emb_type}
     results = defaultdict(list)
-    results['beta_range'] = betas
+    results['beta_range1'] = beta1s
+    results['beta_range2'] = beta2s
 
     cur_best_score = -np.inf
     adj_pos, adj_neg = prepare_syn_ant_graph(words, thesauri)
     times = []
-    for beta in betas:
-        last_time = time.time()
-        emb = DAWE(beta, words_vecs, adj_pos,adj_neg, config)
-        time_spend = round(time.time() - last_time, 1)
-        times.append(time_spend)
-        print('Time took: ', time_spend)
-        emb_obj = Embedding.from_dict({w: emb[:, i] for i, w in enumerate(words)})
-        scores = evaluate_similarity_on_tasks(sim_tasks, emb_obj)
-        for k, v in scores.items():
-            results[k + '_scores'].append(v)
-        summed_score = sum(scores.values())
-        results['summed_score'].append(summed_score)
-        # save current best embeddings
-        if summed_score > cur_best_score:
-            cur_best_score = summed_score
-            results['best_summed_scores'] = cur_best_score
-            results['best_scored_emb'] = emb_obj
+    for beta1 in beta1s:
+        for beta2 in beta2s:
+            last_time = time.time()
+            emb = DAWE(beta1,beta2, words_vecs, adj_pos,adj_neg, config)
+            time_spend = round(time.time() - last_time, 1)
+            times.append(time_spend)
+            print('Time took: ', time_spend)
+            emb_obj = Embedding.from_dict({w: emb[:, i] for i, w in enumerate(words)})
+            scores = evaluate_similarity_on_tasks(sim_tasks, emb_obj)
+            for k, v in scores.items():
+                results[k + '_scores'].append(v)
+            summed_score = sum(scores.values())
+            results['summed_score'].append(summed_score)
+            # save current best embeddings
+            if summed_score > cur_best_score:
+                cur_best_score = summed_score
+                results['best_summed_scores'] = cur_best_score
+                results['best_scored_emb'] = emb_obj
     print('Average time spent: ', round(sum(times) / len(times), 1))
     return results
 

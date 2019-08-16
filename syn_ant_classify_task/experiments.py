@@ -65,11 +65,12 @@ for fname in fnames_test:
     print('test %s: %f' %(fname.split('-')[0],f1))
 
 # Step 4: specialize this embedding
-specialize = False
+specialize = True
 if specialize:
 
     print('results of specialized embedding')
-    betas = np.logspace(-3,2,20)
+    beta1s = np.logspace(-3,2,20)
+    beta2s = np.logspace(-3,2,20)
     # betas = [30]
     thesauri = {'name': 'wn_ro'}
     config = {'sim_mat_type': 'pd', 'eig_vec_option': 'ld', 'emb_type': 0}
@@ -81,27 +82,30 @@ if specialize:
 
     curr_dev_f1 = -np.inf
     times = []
-    for beta in betas:
-        last_time = time.time()
-        emb = DAWE(beta, words_emb, adj_pos, adj_neg, config)
-        time_spend = round(time.time() - last_time, 1)
-        times.append(time_spend)
-        print('Time took: ', time_spend)
+    for beta1 in beta1s:
+        for beta2 in beta2s:
+            last_time = time.time()
+            emb = DAWE(beta1,beta2, words_emb, adj_pos, adj_neg, config)
+            time_spend = round(time.time() - last_time, 1)
+            times.append(time_spend)
+            print('Time took: ', time_spend)
 
-        emb_dict = {w: emb[:, i] for i, w in enumerate(words)}
+            emb_dict = {w: emb[:, i] for i, w in enumerate(words)}
 
-        # tune threshold first
-        th,max_dev_f1 = tune_threshold(ths,fnames_val,emb_dict)
-        if max_dev_f1 > curr_dev_f1:
-            curr_dev_f1 = max_dev_f1
-            best_emb_dict = emb_dict
-            best_th = th
-            best_beta = beta
+            # tune threshold first
+            th,max_dev_f1 = tune_threshold(ths,fnames_val,emb_dict)
+            if max_dev_f1 > curr_dev_f1:
+                curr_dev_f1 = max_dev_f1
+                best_emb_dict = emb_dict
+                best_th = th
+                best_beta1 = beta1
+                best_beta2 = beta2
 
     print('Average time spent: ', round(sum(times)/len(times),1))
     # test with this threshold and specialized embedding
     print('best th: %f' % best_th)
-    print('best beta: %f' % best_beta)
+    print('best beta1: %f' % best_beta1)
+    print('best beta2: %f' % best_beta2)
 
     for fname in fnames_test:
         task_fname = join(SYN_ANT_CLASSIFY_TASK_DIR, 'task_data', fname)

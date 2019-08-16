@@ -110,26 +110,27 @@ if __name__ == '__main__':
     # X_test, y_test = load_X_y(test_name, emb_obj)
     # print('test score on original embedding: %f' % gs.score(X_test,y_test))
 
-    specialize = False
+    specialize = True
 
     if specialize:
 
         # create and test embedding on word_sim tasks
         thesauri_name = 'wn_ro'
-        sim_type = 'n'
+        sim_type = 'pd'
         eigen_vec_option = 'ld'
-        emb_type = 1
+        emb_type = 0
 
         # betas = [0.5]
-        betas = np.linspace(0, 1, 11)
+        beta1s = np.linspace(0, 1, 21)
+        beta2s = np.linspace(0, 1, 21)
         # word_sim_pairs = combine_bunches(*sim_tasks.values())
         # thesauri = {'name':thesauri_name,'word_sim_pairs':word_sim_pairs}
         thesauri = {'name':thesauri_name}
-        draw_word_sim = True
+        draw_word_sim = False
 
         words_emb = [emb_dict[w] for w in words]
         words_emb = np.vstack(words_emb).T
-        results = create_test_emb_on_word_sim_tasks(words, words_emb, {"SIMVERB500-dev":sim_tasks["SIMVERB500-dev"]}, betas,
+        results = create_test_emb_on_word_sim_tasks(words, words_emb, {"SIMVERB500-dev":sim_tasks["SIMVERB500-dev"]}, beta1s,beta2s,
                                                     thesauri, sim_type, eigen_vec_option, emb_type)
 
         results_fname = '_'.join([thesauri_name, sim_type, eigen_vec_option, str(emb_type)])
