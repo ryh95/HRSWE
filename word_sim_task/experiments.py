@@ -110,15 +110,17 @@ if __name__ == '__main__':
     # X_test, y_test = load_X_y(test_name, emb_obj)
     # print('test score on original embedding: %f' % gs.score(X_test,y_test))
 
-    specialize = True
+    specialize = False
+    thesauri_name = 'wn_ro'
+    sim_type = 'n'
+    eigen_vec_option = 'ld'
+    emb_type = 1
+    results_fname = '_'.join([thesauri_name, sim_type, eigen_vec_option, str(emb_type)])
 
     if specialize:
 
         # create and test embedding on word_sim tasks
-        thesauri_name = 'wn_ro'
-        sim_type = 'pd'
-        eigen_vec_option = 'ld'
-        emb_type = 0
+
 
         # betas = [0.5]
         beta1s = np.linspace(0, 1, 21)
@@ -126,22 +128,17 @@ if __name__ == '__main__':
         # word_sim_pairs = combine_bunches(*sim_tasks.values())
         # thesauri = {'name':thesauri_name,'word_sim_pairs':word_sim_pairs}
         thesauri = {'name':thesauri_name}
-        draw_word_sim = False
 
         words_emb = [emb_dict[w] for w in words]
         words_emb = np.vstack(words_emb).T
         results = create_test_emb_on_word_sim_tasks(words, words_emb, {"SIMVERB500-dev":sim_tasks["SIMVERB500-dev"]}, beta1s,beta2s,
                                                     thesauri, sim_type, eigen_vec_option, emb_type)
 
-        results_fname = '_'.join([thesauri_name, sim_type, eigen_vec_option, str(emb_type)])
+
         if not os.path.isfile(results_fname + '.pickle'):
             with open(results_fname + '.pickle', 'wb') as handle:
                 pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        if draw_word_sim:
-            results['benchmark_scores'] = benchmark_scores
-
-            draw_results(results, results_fname + '.html', ["SIMVERB500-dev"])
 
         evaluate_similarity_on_tasks(sim_tasks, results["best_scored_emb"])
 
@@ -149,3 +146,11 @@ if __name__ == '__main__':
         # gs = test_emb_on_sentiment(results['best_scored_emb'], train_name, dev_name)
         # X_test, y_test = load_X_y(test_name, results['best_scored_emb'])
         # print('test score on tunned embedding: %f' % gs.score(X_test,y_test))
+
+    draw_word_sim = True
+    if draw_word_sim:
+        # results['benchmark_scores'] = benchmark_scores
+        with open(results_fname + '.pickle', 'rb') as handle:
+            results = pickle.load(handle)
+        evaluate_similarity_on_tasks(sim_tasks, results["best_scored_emb"])
+        draw_results(results, results_fname + '.html', ["SIMVERB500-dev"])

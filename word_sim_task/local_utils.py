@@ -69,29 +69,34 @@ def create_test_emb_on_word_sim_tasks(words,words_vecs,sim_tasks,beta1s,beta2s,
 
 def draw_results(results, fname, task_names):
     results_trace = []
-    benchmark_scores_trace = []
+    # benchmark_scores_trace = []
+    x_grid,y_grid = np.meshgrid(results['beta_range1'],results['beta_range2'])
+    n = results['beta_range1'].size
     for name in task_names:
+        z_grid = np.array(results[name + '_scores']).reshape(n,n).T
         results_trace.append(
-            go.Scatter(
-                x=results['beta_range'],
-                y=results[name+'_scores'],
-                mode='lines+markers',
-                name='LHRSWE'
+            go.Surface(
+                x=x_grid,
+                y=y_grid,
+                z=z_grid,
+                # mode='lines+markers',
+                name='LHRSWE' # 'HRSWE'
             )
         )
 
-    for name in task_names:
-        benchmark_scores_trace.append(
-            go.Scatter(
-                x=results['beta_range'],
-                y=[results['benchmark_scores'][name]] * len(results['beta_range']),
-                mode='lines+markers',
-                name='SGNS-GN'
-            )
-        )
+    # for name in task_names:
+    #     benchmark_scores_trace.append(
+    #         go.Scatter(
+    #             x=results['beta_range'],
+    #             y=[results['benchmark_scores'][name]] * len(results['beta_range']),
+    #             mode='lines+markers',
+    #             name='SGNS-GN'
+    #         )
+    #     )
 
     plot({
-        "data" : results_trace+benchmark_scores_trace,
+        "data" : results_trace,
+        # "data": results_trace + benchmark_scores_trace,
         "layout": go.Layout(),
     },filename=fname)
 
