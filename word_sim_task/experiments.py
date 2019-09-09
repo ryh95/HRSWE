@@ -15,7 +15,8 @@ from web.evaluate import evaluate_similarity
 import numpy as np
 # import cvxpy as cp
 
-from constants import SPECIALIZED_VECS_DIR, VOCAB_DIR, ORIGINAL_VECS_DIR, ORIGINAL_EMBEDDING, WORD_SIM_TASK_DIR
+from constants import SPECIALIZED_VECS_DIR, VOCAB_DIR, ORIGINAL_VECS_DIR, ORIGINAL_EMBEDDING, WORD_SIM_TASK_DIR, \
+    AR_THES_DIR
 from posdef import nearestPD,isPD
 
 # load embedding_dict
@@ -127,7 +128,7 @@ if __name__ == '__main__':
         beta2s = np.linspace(0, 1, 21)
         # word_sim_pairs = combine_bunches(*sim_tasks.values())
         # thesauri = {'name':thesauri_name,'word_sim_pairs':word_sim_pairs}
-        thesauri = {'name':thesauri_name}
+        thesauri = {'syn_fname':join(AR_THES_DIR,'synonyms.txt'),'ant_fname':join(AR_THES_DIR,'antonyms.txt')}
 
         words_emb = [emb_dict[w] for w in words]
         words_emb = np.vstack(words_emb).T

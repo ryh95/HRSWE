@@ -20,6 +20,7 @@ WORD_NET_DIR = join(THESAURUS_DIR,'word_net')
 ROGET_DIR = join(THESAURUS_DIR,'roget')
 THESAURUS_COM_DIR = join(THESAURUS_DIR,'thesaurus_com')
 WORD_ROGET_DIR = join(THESAURUS_DIR, 'AntonymPipeline')
+AR_THES_DIR = join(THESAURUS_DIR,'attract_repel')
 
 
 SIMLEX_DIR = join(DATA_DIR,'SimLex-999')

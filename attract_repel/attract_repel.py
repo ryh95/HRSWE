@@ -544,7 +544,8 @@ def print_word_vectors(word_vectors, write_path):
 
     f_write = codecs.open(write_path, 'w', 'utf-8')
 
-    type = write_path.split('.')[1]
+    head,tail = os.path.split(write_path)
+    type = tail.split('.')[1]
 
     if type == 'txt':
 

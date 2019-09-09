@@ -1,3 +1,5 @@
+import os
+import random
 import sys
 from collections import defaultdict
 from os.path import join
@@ -9,7 +11,7 @@ import numpy as np
 
 from sklearn.utils import Bunch
 
-from constants import THESAURUS_DIR
+from constants import THESAURUS_DIR, AR_THES_DIR
 from posdef import nearestPD
 
 
@@ -17,45 +19,44 @@ def prepare_syn_ant_graph(words, thesauri):
     G = nx.Graph()
     G.add_nodes_from(words)
     words_set = set(words)
-    if 'name' not in thesauri:
+    if 'syn_fname' not in thesauri or 'ant_fname' not in thesauri:
         # ref: https://stackoverflow.com/a/2950027
         sys.exit('No thesauri found!')
-    if thesauri['name'] == 'word_sim':
-        data = thesauri['word_sim_pairs']
-        for (w1, w2), y in zip(data.X, data.y):
-            if y > 8:
-                G.add_edge(w1, w2, weight=1)
-            elif y < 2:
-                G.add_edge(w1, w2, weight=-1)
-    elif thesauri['name'] == 'wn_ro':
-        syn_constraints = set()
-        with open(join(THESAURUS_DIR,'attract_repel', 'synonyms.txt'), 'r') as f:
-            for line in f:
-                word_pair = line.split()
-                word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
-                if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
-                    syn_constraints |= {(word_pair[0], word_pair[1])}
+    # if thesauri['name'] == 'word_sim':
+    #     data = thesauri['word_sim_pairs']
+    #     for (w1, w2), y in zip(data.X, data.y):
+    #         if y > 8:
+    #             G.add_edge(w1, w2, weight=1)
+    #         elif y < 2:
+    #             G.add_edge(w1, w2, weight=-1)
+    syn_constraints = set()
+    with open(thesauri['syn_fname'], 'r') as f:
+        for line in f:
+            word_pair = line.split()
+            word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
+            if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
+                syn_constraints |= {(word_pair[0], word_pair[1])}
 
-        ant_constraints = set()
-        with open(join(THESAURUS_DIR,'attract_repel', 'antonyms.txt'), 'r') as f:
-            for line in f:
-                word_pair = line.split()
-                word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
-                if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
-                    ant_constraints |= {(word_pair[0], word_pair[1])}
+    ant_constraints = set()
+    with open(thesauri['ant_fname'], 'r') as f:
+        for line in f:
+            word_pair = line.split()
+            word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
+            if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
+                ant_constraints |= {(word_pair[0], word_pair[1])}
 
-        # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
-        # to be consistent with attract_repel's processing
-        for antonym_pair in ant_constraints:
-            if antonym_pair in syn_constraints:
-                syn_constraints.remove(antonym_pair)
+    # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
+    # to be consistent with attract_repel's processing
+    for antonym_pair in ant_constraints:
+        if antonym_pair in syn_constraints:
+            syn_constraints.remove(antonym_pair)
 
-        positive_edges = ((k, v, 1) for k,v in syn_constraints)
-        negative_edges = ((k, v, -1) for k,v in ant_constraints)
-        G.add_weighted_edges_from(positive_edges)
-        # If a pair of words has positive edge and negative edge, the positive edge will be removed
-        # then the previous post-processing step can be removed
-        G.add_weighted_edges_from(negative_edges)
+    positive_edges = ((k, v, 1) for k,v in syn_constraints)
+    negative_edges = ((k, v, -1) for k,v in ant_constraints)
+    G.add_weighted_edges_from(positive_edges)
+    # If a pair of words has positive edge and negative edge, the positive edge will be removed
+    # then the previous post-processing step can be removed
+    G.add_weighted_edges_from(negative_edges)
 
     adj = nx.adjacency_matrix(G, nodelist=words)
 
@@ -160,9 +161,43 @@ def test_on_gre(fname,emb_obj):
 
 
 def select_syn_ant_sample(syn_ant_fname,out_fname,vocab):
+    '''
+    select a subset of thesaurus
+    :param syn_ant_fname:
+    :param out_fname:
+    :param vocab: set
+    :return:
+    '''
     with open(syn_ant_fname,'r') as f,\
          open(out_fname,'w') as f_out:
         for line in f:
             w1,w2 = line.strip().split()
             if w1[3:] in vocab and w2[3:] in vocab:
                 f_out.write(w1+' '+w2+'\n')
+
+def adv_attack_thesaurus(syn_fname,ant_fname):
+    syn_pairs,ant_pairs = set(),set()
+    with open(syn_fname,'r') as f_syn:
+        for line in f_syn:
+            syn_pairs.add(line)
+    with open(ant_fname,'r') as f_ant:
+        for line in f_ant:
+            ant_pairs.add(line)
+
+    # random choose 30% syn pairs and put them to ant pairs
+
+    n_choose = int(len(syn_pairs)*0.3)
+    chosen_pairs = set(random.sample(syn_pairs,n_choose))
+    syn_pairs -= chosen_pairs
+    ant_pairs |= chosen_pairs
+
+    head,syn_name = os.path.split(syn_fname)
+    syn_out_fname = join(head,'adv_'+syn_name)
+    head,ant_name = os.path.split(ant_fname)
+    ant_out_fname = join(head,'adv_'+ant_name)
+    with open(syn_out_fname,'w') as f_syn_out:
+        for line in syn_pairs:
+            f_syn_out.write(line)
+    with open(ant_out_fname, 'w') as f_ant_out:
+        for line in ant_pairs:
+            f_ant_out.write(line)
