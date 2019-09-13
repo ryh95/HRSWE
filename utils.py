@@ -175,7 +175,7 @@ def select_syn_ant_sample(syn_ant_fname,out_fname,vocab):
             if w1[3:] in vocab and w2[3:] in vocab:
                 f_out.write(w1+' '+w2+'\n')
 
-def adv_attack_thesaurus(syn_fname,ant_fname):
+def adv_attack_thesaurus(syn_fname,ant_fname,po_ratio=0.5,reverse=False):
     syn_pairs,ant_pairs = set(),set()
     with open(syn_fname,'r') as f_syn:
         for line in f_syn:
@@ -184,12 +184,21 @@ def adv_attack_thesaurus(syn_fname,ant_fname):
         for line in f_ant:
             ant_pairs.add(line)
 
-    # random choose 30% syn pairs and put them to ant pairs
+    # random choose po_ratio syn pairs and put them to ant pairs
 
-    n_choose = int(len(syn_pairs)*0.3)
-    chosen_pairs = set(random.sample(syn_pairs,n_choose))
-    syn_pairs -= chosen_pairs
-    ant_pairs |= chosen_pairs
+
+    if reverse:
+        # choose ant pairs and put into syn pairs
+        n_choose = int(len(ant_pairs) * po_ratio)
+        chosen_pairs = set(random.sample(ant_pairs, n_choose))
+        syn_pairs |= chosen_pairs
+        ant_pairs -= chosen_pairs
+    else:
+        # choose syn pairs and put into ant pairs
+        n_choose = int(len(syn_pairs) * po_ratio)
+        chosen_pairs = set(random.sample(syn_pairs, n_choose))
+        syn_pairs -= chosen_pairs
+        ant_pairs |= chosen_pairs
 
     head,syn_name = os.path.split(syn_fname)
     syn_out_fname = join(head,'adv_'+syn_name)

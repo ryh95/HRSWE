@@ -57,20 +57,21 @@ if not os.path.isfile(sub_syn_fname) and not os.path.isfile(sub_ant_fname):
     select_syn_ant_sample(join(AR_THES_DIR,'antonyms.txt'),sub_ant_fname,words)
 
 # generate adversarial subset
+po_ratio = 1.0
 adv_sub_syn_fname = join(AR_THES_DIR,'adv_sub_synonyms.txt')
 adv_sub_ant_fname = join(AR_THES_DIR,'adv_sub_antonyms.txt')
 if not os.path.isfile(adv_sub_syn_fname) and not os.path.isfile(adv_sub_ant_fname):
-    adv_attack_thesaurus(sub_syn_fname,sub_ant_fname)
+    adv_attack_thesaurus(sub_syn_fname,sub_ant_fname,po_ratio,reverse=True)
 
 
 # change to SPECIALIZED_VECS_DIR, set sepcialize to False and change method name
 # to see the result of specialized vectors
 # method_name = 'attract_repel/paper_results'
 method_name = ''
-sel_vec_dir = join(ATTRACT_REPEL_VECS,method_name)
-# sel_vec_dir = join(ORIGINAL_VECS_DIR,method_name)
-sel_vec_fname = join(sel_vec_dir,'adv_SIMLEX999_SIMVERB3000-test_SIMVERB500-dev')
-# sel_vec_fname = join(sel_vec_dir,vocab_fname)
+# sel_vec_dir = join(ATTRACT_REPEL_VECS,method_name)
+sel_vec_dir = join(ORIGINAL_VECS_DIR,method_name)
+# sel_vec_fname = join(sel_vec_dir,'adv_SIMLEX999_SIMVERB3000-test_SIMVERB500-dev')
+sel_vec_fname = join(sel_vec_dir,vocab_fname)
 # sel_vec_fname = 'paper_results/wn_ro_pd_ld_0'
 
 if os.path.isfile(sel_vec_fname+'.pickle'):
@@ -96,7 +97,7 @@ benchmark_scores = evaluate_similarity_on_tasks(sim_tasks, emb_dict)
 # X_test, y_test = load_X_y(test_name, emb_obj)
 # print('test score on original embedding: %f' % gs.score(X_test,y_test))
 
-specialize = False
+specialize = True
 thesauri_name = 'wn_ro'
 sim_type = 'n'
 eigen_vec_option = 'ld'

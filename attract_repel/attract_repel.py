@@ -30,19 +30,14 @@ class ExperimentRun:
     This class stores all of the data and hyperparameters required for an Attract-Repel run.
     """
 
-    def __init__(self, config_filepath):
+    def __init__(self, config):
         """
         To initialise the class, we need to supply the config file, which contains the location of
         the pretrained (distributional) word vectors, the location of (potentially more than one)
         collections of linguistic constraints (one pair per line), as well as the
         hyperparameters of the Attract-Repel procedure (as detailed in the TACL paper).
         """
-        self.config = configparser.RawConfigParser()
-        try:
-            self.config.read(config_filepath)
-        except:
-            print("Couldn't read config file from", config_filepath)
-            return None
+        self.config = config
 
         distributional_vectors_filepath = self.config.get("data", "distributional_vectors")
 
@@ -58,8 +53,8 @@ class ExperimentRun:
         if not distributional_vectors:
             return
 
-        print("SimLex score (Spearman's rho coefficient) of initial vectors is:\n")
-        simlex_scores(distributional_vectors)
+        # print("SimLex score (Spearman's rho coefficient) of initial vectors is:\n")
+        # simlex_scores(distributional_vectors)
 
         self.vocabulary = set(distributional_vectors.keys())
 
@@ -72,8 +67,10 @@ class ExperimentRun:
             self.inverted_index[idx] = word
 
         # load list of filenames for synonyms and antonyms.
-        synonym_list = self.config.get("data", "synonyms").replace("[", "").replace("]", "").replace(" ", "").split(",")
-        antonym_list = self.config.get("data", "antonyms").replace("[", "").replace("]", "").replace(" ", "").split(",")
+        # synonym_list = self.config.get("data", "synonyms").replace("[", "").replace("]", "").replace(" ", "").split(",")
+        # antonym_list = self.config.get("data", "antonyms").replace("[", "").replace("]", "").replace(" ", "").split(",")
+        synonym_list = self.config.get('data','synonyms_list')
+        antonym_list = self.config.get('data','antonyms_list')
 
         self.synonyms = set()
         self.antonyms = set()
@@ -106,6 +103,7 @@ class ExperimentRun:
             numpy_embedding[idx, :] = distributional_vectors[self.inverted_index[idx]]
 
         # load the handles so that we can load current state of vectors from the Tensorflow embedding.
+        tf.reset_default_graph()
         embedding_handles = self.initialise_model(numpy_embedding)
 
         self.embedding_attract_left = embedding_handles[0]
@@ -260,18 +258,18 @@ class ExperimentRun:
         self.batch_size = int(self.config.getfloat("hyperparameters", "batch_size"))
         self.regularisation_constant_value = self.config.getfloat("hyperparameters", "l2_reg_constant")
         self.max_iter = self.config.getfloat("hyperparameters", "max_iter")
-        self.log_scores_over_time = self.config.get("experiment", "log_scores_over_time")
-        self.print_simlex = self.config.get("experiment", "print_simlex")
+        # self.log_scores_over_time = self.config.get("experiment", "log_scores_over_time")
+        # self.print_simlex = self.config.get("experiment", "print_simlex")
 
-        if self.log_scores_over_time in ["True", "true"]:
-            self.log_scores_over_time = True
-        else:
-            self.log_scores_over_time = False
-
-        if self.print_simlex in ["True", "true"]:
-            self.print_simlex = True
-        else:
-            self.print_simlex = False
+        # if self.log_scores_over_time in ["True", "true"]:
+        #     self.log_scores_over_time = True
+        # else:
+        #     self.log_scores_over_time = False
+        #
+        # if self.print_simlex in ["True", "true"]:
+        #     self.print_simlex = True
+        # else:
+        #     self.print_simlex = False
 
         print("\nExperiment hyperparameters (attract_margin, repel_margin, batch_size, l2_reg_constant, max_iter):", \
               self.attract_margin_value, self.repel_margin_value, self.batch_size, self.regularisation_constant_value,
@@ -332,7 +330,7 @@ class ExperimentRun:
 
         return negative_examples
 
-    def attract_repel(self):
+    def attract_repel(self,evaluator=None):
         """
         This method repeatedly applies optimisation steps to fit the word vectors to the provided linguistic constraints.
         """
@@ -367,9 +365,9 @@ class ExperimentRun:
         start = time.time()
         last_time = time.time()
 
-        if self.log_scores_over_time:
-            fwrite_simlex = open("results/simlex_scores.txt", "w")
-            fwrite_wordsim = open("results/wordsim_scores.txt", "w")
+        # if self.log_scores_over_time:
+        #     fwrite_simlex = open("results/simlex_scores.txt", "w")
+        #     fwrite_wordsim = open("results/wordsim_scores.txt", "w")
 
         while current_iteration < self.max_iter:
 
@@ -398,13 +396,13 @@ class ExperimentRun:
             for batch_index in range(0, batches_per_epoch):
 
                 # we can Log SimLex / WordSim scores
-                if self.log_scores_over_time and (batch_index % (batches_per_epoch / 20) == 0):
-                    (simlex_score, wordsim_score) = self.create_vector_dictionary()
-                    list_of_simlex.append(simlex_score)
-                    list_of_wordsim.append(wordsim_score)
-
-                    print(len(list_of_simlex) + 1, simlex_score, file=fwrite_simlex)
-                    print(len(list_of_simlex) + 1, wordsim_score, file=fwrite_wordsim)
+                # if self.log_scores_over_time and (batch_index % (batches_per_epoch / 20) == 0):
+                #     (simlex_score, wordsim_score) = self.create_vector_dictionary()
+                #     list_of_simlex.append(simlex_score)
+                #     list_of_wordsim.append(wordsim_score)
+                #
+                #     print(len(list_of_simlex) + 1, simlex_score, file=fwrite_simlex)
+                #     print(len(list_of_simlex) + 1, wordsim_score, file=fwrite_wordsim)
 
                 syn_or_ant_batch = list_of_batch_types[batch_index]
 
@@ -438,25 +436,52 @@ class ExperimentRun:
 
             current_iteration += 1
             self.create_vector_dictionary()  # whether to print SimLex score at the end of each epoch
+
+            # eval sp word vectors
+            if evaluator is not None:
+                evaluator.evaluate(self.word_vectors,self)
+
         print("Training took ", round(time.time() - start, 1), "seconds.")
 
     def create_vector_dictionary(self):
         """
         Extracts the current word vectors from TensorFlow embeddings and (if print_simlex=True) prints their SimLex scores.
         """
-        log_time = time.time()
+        # log_time = time.time()
 
         [current_vectors] = self.sess.run([self.W_dynamic])
         self.word_vectors = {}
         for idx in range(0, self.vocabulary_size):
             self.word_vectors[self.inverted_index[idx]] = normalise_vector(current_vectors[idx, :])
 
-        if self.log_scores_over_time or self.print_simlex:
-            (score_simlex, score_wordsim) = simlex_scores(self.word_vectors, self.print_simlex)
-            return (score_simlex, score_wordsim)
+        # if self.log_scores_over_time or self.print_simlex:
+        #     (score_simlex, score_wordsim) = simlex_scores(self.word_vectors, self.print_simlex)
+        #     return (score_simlex, score_wordsim)
 
         return (1.0, 1.0)
 
+    def print_word_vectors(self,word_vectors, write_path):
+        """
+        This function prints the collection of word vectors to file, in a plain textual format.
+        """
+
+        f_write = codecs.open(write_path, 'w', 'utf-8')
+
+        head, tail = os.path.split(write_path)
+        type = tail.split('.')[1]
+
+        if type == 'txt':
+
+            for key in word_vectors:
+                print(key, " ".join(map(str, numpy.round(word_vectors[key], decimals=6))), file=f_write)
+
+        elif type == 'pickle':
+
+            with open(write_path, 'wb') as f:
+                pickle.dump({key: numpy.round(word_vectors[key], decimals=6) for key in word_vectors}, f,
+                            protocol=pickle.HIGHEST_PROTOCOL)
+
+        print("Printed", len(word_vectors), "word vectors to:", write_path)
 
 def random_different_from(top_range, number_to_not_repeat):
     result = random.randint(0, top_range - 1)
@@ -537,107 +562,87 @@ def load_word_vectors(file_destination,type='glove'):
     return word_dictionary
 
 
-def print_word_vectors(word_vectors, write_path):
-    """
-    This function prints the collection of word vectors to file, in a plain textual format.
-    """
-
-    f_write = codecs.open(write_path, 'w', 'utf-8')
-
-    head,tail = os.path.split(write_path)
-    type = tail.split('.')[1]
-
-    if type == 'txt':
-
-        for key in word_vectors:
-            print(key, " ".join(map(str, numpy.round(word_vectors[key], decimals=6))), file=f_write)
-
-    elif type == 'pickle':
-
-        with open(write_path,'wb') as f:
-            pickle.dump({key:numpy.round(word_vectors[key], decimals=6) for key in word_vectors}, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-    print("Printed", len(word_vectors), "word vectors to:", write_path)
 
 
-def simlex_analysis(word_vectors, language="english", source="simlex", add_prefixes=True):
-    """
-    This method computes the Spearman's rho correlation (with p-value) of the supplied word vectors.
-    """
-    pair_list = []
-    config = configparser.RawConfigParser()
-    config_filepath = join(ATTRACT_REPEL_DIR, "experiment_parameters.cfg")
-    config.read(config_filepath)
-    eval_dir = config.get("data","eval_dir_path")
-    if source == "simlex":
-        fread_simlex = codecs.open(join(eval_dir,"simlex-") + language + ".txt", 'r', 'utf-8')
-    elif source == "simlex-old":
-        fread_simlex = codecs.open(join(eval_dir,"simlex-english-old.txt"), 'r', 'utf-8')
-    elif source == "simverb":
-        fread_simlex = codecs.open(join(eval_dir,"simverb.txt"), 'r', 'utf-8')
-    elif source == "wordsim":
-        fread_simlex = codecs.open(join(eval_dir,"ws-353/wordsim353-") + language + ".txt", 'r',
-                                   'utf-8')  # specify english, english-rel, etc.
 
-    # needed for prefixes if we are adding these.
-    lp_map = {}
-    lp_map["english"] = "en_"
-    lp_map["german"] = "de_"
-    lp_map["italian"] = "it_"
-    lp_map["russian"] = "ru_"
-    lp_map["croatian"] = "sh_"
-    lp_map["hebrew"] = "he_"
-
-    line_number = 0
-    for line in fread_simlex:
-
-        if line_number > 0:
-
-            tokens = line.split()
-            word_i = tokens[0].lower()
-            word_j = tokens[1].lower()
-            score = float(tokens[2])
-
-            if add_prefixes:
-                word_i = lp_map[language] + word_i
-                word_j = lp_map[language] + word_j
-
-            if word_i in word_vectors and word_j in word_vectors:
-                pair_list.append(((word_i, word_j), score))
-            else:
-                pass
-
-        line_number += 1
-
-    if not pair_list:
-        return (0.0, 0)
-
-    pair_list.sort(key=lambda x: - x[1])
-
-    coverage = len(pair_list)
-
-    extracted_list = []
-    extracted_scores = {}
-
-    for (x, y) in pair_list:
-        (word_i, word_j) = x
-        current_distance = distance(word_vectors[word_i], word_vectors[word_j])
-        extracted_scores[(word_i, word_j)] = current_distance
-        extracted_list.append(((word_i, word_j), current_distance))
-
-    extracted_list.sort(key=lambda x: x[1])
-
-    spearman_original_list = []
-    spearman_target_list = []
-
-    for position_1, (word_pair, score_1) in enumerate(pair_list):
-        score_2 = extracted_scores[word_pair]
-        position_2 = extracted_list.index((word_pair, score_2))
-        spearman_original_list.append(position_1)
-        spearman_target_list.append(position_2)
-
-    spearman_rho = spearmanr(spearman_original_list, spearman_target_list)
-    return round(spearman_rho[0], 3), coverage
+# def simlex_analysis(word_vectors, language="english", source="simlex", add_prefixes=True):
+#     """
+#     This method computes the Spearman's rho correlation (with p-value) of the supplied word vectors.
+#     """
+#     pair_list = []
+#     config = configparser.RawConfigParser()
+#     config_filepath = join(ATTRACT_REPEL_DIR, "experiment_parameters.cfg")
+#     config.read(config_filepath)
+#     eval_dir = config.get("data","eval_dir_path")
+#     if source == "simlex":
+#         fread_simlex = codecs.open(join(eval_dir,"simlex-") + language + ".txt", 'r', 'utf-8')
+#     elif source == "simlex-old":
+#         fread_simlex = codecs.open(join(eval_dir,"simlex-english-old.txt"), 'r', 'utf-8')
+#     elif source == "simverb":
+#         fread_simlex = codecs.open(join(eval_dir,"simverb.txt"), 'r', 'utf-8')
+#     elif source == "wordsim":
+#         fread_simlex = codecs.open(join(eval_dir,"ws-353/wordsim353-") + language + ".txt", 'r',
+#                                    'utf-8')  # specify english, english-rel, etc.
+#
+#     # needed for prefixes if we are adding these.
+#     lp_map = {}
+#     lp_map["english"] = "en_"
+#     lp_map["german"] = "de_"
+#     lp_map["italian"] = "it_"
+#     lp_map["russian"] = "ru_"
+#     lp_map["croatian"] = "sh_"
+#     lp_map["hebrew"] = "he_"
+#
+#     line_number = 0
+#     for line in fread_simlex:
+#
+#         if line_number > 0:
+#
+#             tokens = line.split()
+#             word_i = tokens[0].lower()
+#             word_j = tokens[1].lower()
+#             score = float(tokens[2])
+#
+#             if add_prefixes:
+#                 word_i = lp_map[language] + word_i
+#                 word_j = lp_map[language] + word_j
+#
+#             if word_i in word_vectors and word_j in word_vectors:
+#                 pair_list.append(((word_i, word_j), score))
+#             else:
+#                 pass
+#
+#         line_number += 1
+#
+#     if not pair_list:
+#         return (0.0, 0)
+#
+#     pair_list.sort(key=lambda x: - x[1])
+#
+#     coverage = len(pair_list)
+#
+#     extracted_list = []
+#     extracted_scores = {}
+#
+#     for (x, y) in pair_list:
+#         (word_i, word_j) = x
+#         current_distance = distance(word_vectors[word_i], word_vectors[word_j])
+#         extracted_scores[(word_i, word_j)] = current_distance
+#         extracted_list.append(((word_i, word_j), current_distance))
+#
+#     extracted_list.sort(key=lambda x: x[1])
+#
+#     spearman_original_list = []
+#     spearman_target_list = []
+#
+#     for position_1, (word_pair, score_1) in enumerate(pair_list):
+#         score_2 = extracted_scores[word_pair]
+#         position_2 = extracted_list.index((word_pair, score_2))
+#         spearman_original_list.append(position_1)
+#         spearman_target_list.append(position_2)
+#
+#     spearman_rho = spearmanr(spearman_original_list, spearman_target_list)
+#     return round(spearman_rho[0], 3), coverage
 
 
 def normalise_vector(v1):
@@ -655,65 +660,66 @@ def distance(v1, v2, normalised_vectors=False):
         return 1 - dot(v1, v2) / (norm(v1) * norm(v2))
 
 
-def simlex_scores(word_vectors, print_simlex=True):
-    for language in ["english"]:
+# def simlex_scores(word_vectors, print_simlex=True):
+#     for language in ["english"]:
+#
+#         simlex_score, simlex_coverage = simlex_analysis(word_vectors, language,add_prefixes=False)
+#
+#         if language not in ["hebrew", "croatian"]:
+#             ws_score, ws_coverage = simlex_analysis(word_vectors, language, source="wordsim",add_prefixes=False)
+#         else:
+#             ws_score = 0.0
+#             ws_coverage = 0
+#
+#         if language == "english":
+#             simverb_score, simverb_coverage = simlex_analysis(word_vectors, language, source="simverb",add_prefixes=False)
+#
+#         if simlex_coverage > 0:
+#
+#             if print_simlex:
+#
+#                 if language == "english":
+#
+#                     simlex_old, cov_old = simlex_analysis(word_vectors, language, source="simlex-old",add_prefixes=False)
+#
+#                     print("SimLex score for", language, "is:", simlex_score, "Original SimLex score is:", simlex_old,
+#                           "coverage:", simlex_coverage, "/ 999")
+#                     print("SimVerb score for", language, "is:", simverb_score, "coverage:", simverb_coverage, "/ 3500")
+#                     print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
+#
+#                 elif language in ["italian", "german", "russian"]:
+#
+#                     print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999")
+#                     print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
+#
+#                 elif language in ["hebrew", "croatian"]:
+#
+#                     print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999\n")
+#
+#         if language == "english":
+#             simlex_score_en = simlex_score
+#             ws_score_en = ws_score
+#
+#     return simlex_score_en, ws_score_en
 
-        simlex_score, simlex_coverage = simlex_analysis(word_vectors, language,add_prefixes=False)
 
-        if language not in ["hebrew", "croatian"]:
-            ws_score, ws_coverage = simlex_analysis(word_vectors, language, source="wordsim",add_prefixes=False)
-        else:
-            ws_score = 0.0
-            ws_coverage = 0
-
-        if language == "english":
-            simverb_score, simverb_coverage = simlex_analysis(word_vectors, language, source="simverb",add_prefixes=False)
-
-        if simlex_coverage > 0:
-
-            if print_simlex:
-
-                if language == "english":
-
-                    simlex_old, cov_old = simlex_analysis(word_vectors, language, source="simlex-old",add_prefixes=False)
-
-                    print("SimLex score for", language, "is:", simlex_score, "Original SimLex score is:", simlex_old,
-                          "coverage:", simlex_coverage, "/ 999")
-                    print("SimVerb score for", language, "is:", simverb_score, "coverage:", simverb_coverage, "/ 3500")
-                    print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
-
-                elif language in ["italian", "german", "russian"]:
-
-                    print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999")
-                    print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
-
-                elif language in ["hebrew", "croatian"]:
-
-                    print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999\n")
-
-        if language == "english":
-            simlex_score_en = simlex_score
-            ws_score_en = ws_score
-
-    return simlex_score_en, ws_score_en
-
-
-def run_experiment(config_filepath):
+def run_experiment(config):
     """
     This method runs the counterfitting experiment, printing the SimLex-999 score of the initial
     vectors, then counter-fitting them using the supplied linguistic constraints.
     We then print the SimLex-999 score of the final vectors, and save them to a .txt file in the
     results directory.
+    config: object returned by configparser.RawConfigParser()
     """
-    current_experiment = ExperimentRun(config_filepath)
+    current_experiment = ExperimentRun(config)
 
     current_experiment.attract_repel()
 
-    print("\nSimLex score (Spearman's rho coefficient) of the final vectors is:")
+    # print("\nSimLex score (Spearman's rho coefficient) of the final vectors is:")
+    #
+    # simlex_scores(current_experiment.word_vectors), "\n"
 
-    simlex_scores(current_experiment.word_vectors), "\n"
-
-    os.system("mkdir -p results")
+    # os.system("mkdir -p results")
 
     print_word_vectors(current_experiment.word_vectors, current_experiment.output_filepath)
 
@@ -729,7 +735,15 @@ def main():
         print("\nUsing the default config file: experiment_parameters.cfg\n")
         config_filepath = join(ATTRACT_REPEL_DIR,"experiment_parameters.cfg")
 
-    run_experiment(config_filepath)
+    config = configparser.RawConfigParser()
+    # todo: set synonyms_list and antonyms_list to python list
+    try:
+        config.read(config_filepath)
+    except:
+        print("Couldn't read config file from", config_filepath)
+        return None
+
+    run_experiment(config)
 
 
 if __name__ == '__main__':
