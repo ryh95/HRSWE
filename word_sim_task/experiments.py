@@ -37,7 +37,7 @@ if __name__ == '__main__':
             # "WS353S": fetch_WS353(which="similarity"),
             "SIMLEX999": fetch_SimLex999(),
             "SIMVERB3000-test" : fetch_SimVerb3500(join(WORD_SIM_TASK_DIR,'task_data','SimVerb-3000-test.txt')),
-            "SIMVERB500-dev" : fetch_SimVerb3500(join(WORD_SIM_TASK_DIR,'task_data','SimVerb-500-dev.txt')),
+            "SIMVERB500-dev" : fetch_SimVerb3500(join(WORD_SIM_TASK_DIR,'task_data','SimVerb-500-dev-adv.txt')),
             # "RW": fetch_RW()
             # "RG65": fetch_RG65(),
             # "MTurk": fetch_MTurk(),
@@ -111,11 +111,11 @@ if __name__ == '__main__':
     # X_test, y_test = load_X_y(test_name, emb_obj)
     # print('test score on original embedding: %f' % gs.score(X_test,y_test))
 
-    specialize = False
+    specialize = True
     thesauri_name = 'wn_ro'
-    sim_type = 'n'
+    sim_type = 'pd'
     eigen_vec_option = 'ld'
-    emb_type = 1
+    emb_type = 0
     results_fname = '_'.join([thesauri_name, sim_type, eigen_vec_option, str(emb_type)])
 
     if specialize:
@@ -125,13 +125,16 @@ if __name__ == '__main__':
 
         # betas = [0.5]
         beta1s = np.linspace(0, 1, 21)
+        # beta1s = [10,50,100]
         beta2s = np.linspace(0, 1, 21)
+        # beta2s = [10,50,100]
         # word_sim_pairs = combine_bunches(*sim_tasks.values())
         # thesauri = {'name':thesauri_name,'word_sim_pairs':word_sim_pairs}
-        thesauri = {'syn_fname':join(AR_THES_DIR,'synonyms.txt'),'ant_fname':join(AR_THES_DIR,'antonyms.txt')}
+        thesauri = {'syn_fname':join(AR_THES_DIR,'sub_synonyms.txt'),'ant_fname':join(AR_THES_DIR,'sub_antonyms.txt')}
 
         words_emb = [emb_dict[w] for w in words]
         words_emb = np.vstack(words_emb).T
+        # words_emb = words_emb / linalg.norm(words_emb,axis=0)
         results = create_test_emb_on_word_sim_tasks(words, words_emb, {"SIMVERB500-dev":sim_tasks["SIMVERB500-dev"]}, beta1s,beta2s,
                                                     thesauri, sim_type, eigen_vec_option, emb_type)
 
@@ -148,7 +151,7 @@ if __name__ == '__main__':
         # X_test, y_test = load_X_y(test_name, results['best_scored_emb'])
         # print('test score on tunned embedding: %f' % gs.score(X_test,y_test))
 
-    draw_word_sim = True
+    draw_word_sim = False
     if draw_word_sim:
         # results['benchmark_scores'] = benchmark_scores
         with open(results_fname + '.pickle', 'rb') as handle:

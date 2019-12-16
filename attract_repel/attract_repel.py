@@ -335,7 +335,7 @@ class ExperimentRun:
         This method repeatedly applies optimisation steps to fit the word vectors to the provided linguistic constraints.
         """
 
-        current_iteration = 0
+        self.current_iteration = 0
 
         # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
         for antonym_pair in self.antonyms:
@@ -369,7 +369,7 @@ class ExperimentRun:
         #     fwrite_simlex = open("results/simlex_scores.txt", "w")
         #     fwrite_wordsim = open("results/wordsim_scores.txt", "w")
 
-        while current_iteration < self.max_iter:
+        while self.current_iteration < self.max_iter:
 
             # how many attract/repel batches we've done in this epoch so far.
             antonym_counter = 0
@@ -386,10 +386,10 @@ class ExperimentRun:
             list_of_batch_types[syn_batches:] = [1] * ant_batches  # all antonym batches to 1
             random.shuffle(list_of_batch_types)
 
-            if current_iteration == 0:
-                print("\nStarting epoch:", current_iteration + 1, "\n")
+            if self.current_iteration == 0:
+                print("\nStarting epoch:", self.current_iteration + 1, "\n")
             else:
-                print("\nStarting epoch:", current_iteration + 1, "Last epoch took:", round(time.time() - last_time, 1),
+                print("\nStarting epoch:", self.current_iteration + 1, "Last epoch took:", round(time.time() - last_time, 1),
                       "seconds. \n")
                 last_time = time.time()
 
@@ -434,12 +434,13 @@ class ExperimentRun:
 
                     antonym_counter += 1
 
-            current_iteration += 1
             self.create_vector_dictionary()  # whether to print SimLex score at the end of each epoch
 
             # eval sp word vectors
             if evaluator is not None:
                 evaluator.evaluate(self.word_vectors,self)
+
+            self.current_iteration += 1
 
         print("Training took ", round(time.time() - start, 1), "seconds.")
 

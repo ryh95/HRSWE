@@ -17,6 +17,6 @@ class evaluator(object):
             self.best_eval_score = new_eval_score
             print('Current best eval score: %f' %(self.best_eval_score))
             print('Writing best parameters to cfg')
-
+            model.config.set('hyperparameters','max_iter',model.current_iteration)
             with open('best_AR_parameters.cfg', 'w') as configfile:
                 model.config.write(configfile)

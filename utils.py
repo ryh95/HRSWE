@@ -124,6 +124,7 @@ def DAWE(beta1,beta2,emb,adj_pos,adj_neg,config):
     if config['eig_vec_option'] == 'ld':
         # choose d largest eigenvectors
         # ref: https://stackoverflow.com/a/12168664
+        # turbo: use divide and conquer algorithm or not
         lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
 
     if config['emb_type'] == 0: # together use with pd
