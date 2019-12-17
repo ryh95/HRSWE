@@ -435,12 +435,10 @@ class ExperimentRun:
                     antonym_counter += 1
 
             self.create_vector_dictionary()  # whether to print SimLex score at the end of each epoch
-
+            self.current_iteration += 1
             # eval sp word vectors
             if evaluator is not None:
-                evaluator.evaluate(self.word_vectors,self)
-
-            self.current_iteration += 1
+                evaluator.eval_AR(self.word_vectors, self)
 
         print("Training took ", round(time.time() - start, 1), "seconds.")
 
