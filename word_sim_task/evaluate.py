@@ -1,5 +1,6 @@
 from configparser import ConfigParser
 
+import scipy
 from six import iteritems
 from web.evaluate import evaluate_similarity
 
@@ -28,6 +29,16 @@ class evaluator(object):
         print('*' * 30)
         for name, data in iteritems(tasks):
             score = evaluate_similarity(emb_obj, data.X, data.y)
+            print("Spearman correlation of scores on {} {}".format(name, score))
+            scores[name] = score
+        return scores
+
+    def eval_injected_matrix(self,tasks,matrix,words2id):
+        scores = {}
+        print('*' * 30)
+        for name, data in iteritems(tasks):
+            pred_y = [matrix[tuple(words2id[w] for w in p)] for p in data.X]
+            score = scipy.stats.spearmanr(pred_y, data.y).correlation
             print("Spearman correlation of scores on {} {}".format(name, score))
             scores[name] = score
         return scores
