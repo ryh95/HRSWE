@@ -1,5 +1,6 @@
 import pickle
 import random
+from os import path
 from os.path import join
 
 from six import iteritems
@@ -67,6 +68,46 @@ class Dataset(object):
         with open(ant_out_fname, 'w') as f_ant_out:
             for line in ant_pairs:
                 f_ant_out.write(line)
+
+    def generate_adv_thesaurus2(self,ratio):
+        task_tuples = set()
+        reverse_task_tuples = set()
+        for k,v in self.sim_tasks.items():
+           task_tuples |= set(tuple(x) for x in v['X'])
+           reverse_task_tuples |= set(tuple(x[::-1]) for x in v['X'])
+
+        syn_pairs, ant_pairs = set(), set()
+        with open(self.thesauri['syn_fname'], 'r') as f_syn:
+            for line in f_syn:
+                word_pair = line.split()
+                word_pair = tuple(word[3:] for word in word_pair)  # remove the 'en-' prefix
+                syn_pairs.add(word_pair)
+        with open(self.thesauri['ant_fname'], 'r') as f_ant:
+            for line in f_ant:
+                word_pair = line.split()
+                word_pair = tuple(word[3:] for word in word_pair)  # remove the 'en-' prefix
+                ant_pairs.add(word_pair)
+
+        inter_syn_pairs = task_tuples & syn_pairs
+        inter_syn_pairs |= reverse_task_tuples & syn_pairs
+        inter_ant_pairs = task_tuples & ant_pairs
+        inter_ant_pairs |= reverse_task_tuples & ant_pairs
+
+        # adversarial approach 1
+        # choose a portion of sel_syn_pairs and put them into antonym pairs
+        subset = set(random.sample(inter_syn_pairs,int(len(inter_syn_pairs)*ratio)))
+        syn_pairs -= subset
+        ant_pairs |= subset
+
+        # write into files
+        pa,fname = path.split(self.thesauri['syn_fname'])
+        with open(join(pa,'adv_'+fname), 'w') as f_syn_out:
+            for line in syn_pairs:
+                f_syn_out.write(' '.join('en_'+w for w in line)+'\n')
+        pa, fname = path.split(self.thesauri['ant_fname'])
+        with open(join(pa,'adv_'+fname), 'w') as f_ant_out:
+            for line in ant_pairs:
+                f_ant_out.write(' '.join('en_'+w for w in line)+'\n')
 
     def generate_adv_val(self,ratio):
 

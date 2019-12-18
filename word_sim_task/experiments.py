@@ -18,7 +18,7 @@ class BaseExperiments(object):
 
     def run_HRSWE(self, *hyps, **config):
         beta1s,beta2s = hyps
-        self.results_fname = '_'.join([config['thesauri_name'], config['sim_mat_type'], config['eigen_vec_option'], config['emb_type']])
+        self.results_fname = '_'.join([config['thesauri_name'], config['sim_mat_type'], config['eig_vec_option'], str(config['emb_type'])])
 
         # betas = [0.5]
         # beta1s = [10,50,100]
@@ -56,6 +56,7 @@ class BaseExperiments(object):
                     cur_best_score = summed_score
                     results['best_summed_scores'] = cur_best_score
                     results['best_scored_emb'] = emb_obj
+                    results['best_betas'] = [beta1,beta2]
         print('Average time spent: ', round(sum(times) / len(times), 1))
 
         with open(self.results_fname + '.pickle', 'wb') as handle:
@@ -74,6 +75,10 @@ class BaseExperiments(object):
                 model = self.AR(config)
                 model.attract_repel(self.evaluator)
 
+        # eval the ar specialized embedding
+        with open(config.get('data','output_filepath'), 'rb') as handle:
+            emb_dict = pickle.load(handle)
+        self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks,emb_dict)
 
     def draw_HRSWE_dev_results(self):
 
