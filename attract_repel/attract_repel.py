@@ -14,9 +14,7 @@ import json
 
 from gensim.models import KeyedVectors
 from numpy.linalg import norm
-from numpy import dot
 import codecs
-from scipy.stats import spearmanr
 import tensorflow as tf
 
 from scipy.spatial.distance import pdist
@@ -139,6 +137,7 @@ class ExperimentRun:
         # Attract Cost Function:
 
         # placeholders for example pairs...
+        # IMPORTANT: the embeddings are all normalized
         attract_examples_left = tf.nn.l2_normalize(tf.nn.embedding_lookup(self.W_dynamic, self.attract_examples[:, 0]),
                                                    1)
         attract_examples_right = tf.nn.l2_normalize(tf.nn.embedding_lookup(self.W_dynamic, self.attract_examples[:, 1]),
@@ -372,16 +371,17 @@ class ExperimentRun:
         while self.current_iteration < self.max_iter:
 
             # how many attract/repel batches we've done in this epoch so far.
-            antonym_counter = 0
-            synonym_counter = 0
+            antonym_batch_counter = 0
+            synonym_batch_counter = 0
 
             order_of_synonyms = list(range(0, self.syn_count))
             order_of_antonyms = list(range(0, self.ant_count))
-
+            # IMPORTANT: before training the syn/ant constraints will be shuffled
             random.shuffle(order_of_synonyms)
             random.shuffle(order_of_antonyms)
 
             # list of 0 where we run synonym batch, 1 where we run antonym batch
+            # IMPORTANT: training steps of syn and ant mini batches will be shuffled
             list_of_batch_types = [0] * batches_per_epoch
             list_of_batch_types[syn_batches:] = [1] * ant_batches  # all antonym batches to 1
             random.shuffle(list_of_batch_types)
@@ -410,21 +410,21 @@ class ExperimentRun:
                     # do one synonymy batch:
 
                     synonymy_examples = [self.synonyms[order_of_synonyms[x]] for x in
-                                         range(synonym_counter * self.batch_size,
-                                               (synonym_counter + 1) * self.batch_size)]
+                                         range(synonym_batch_counter * self.batch_size,
+                                               (synonym_batch_counter + 1) * self.batch_size)]
                     current_negatives = self.extract_negative_examples(synonymy_examples, attract_batch=True)
 
                     self.sess.run([self.attract_cost_step], feed_dict={self.attract_examples: synonymy_examples,
                                                                        self.negative_examples_attract: current_negatives, \
                                                                        self.attract_margin: self.attract_margin_value,
                                                                        self.regularisation_constant: self.regularisation_constant_value})
-                    synonym_counter += 1
+                    synonym_batch_counter += 1
 
                 else:
 
                     antonymy_examples = [self.antonyms[order_of_antonyms[x]] for x in
-                                         range(antonym_counter * self.batch_size,
-                                               (antonym_counter + 1) * self.batch_size)]
+                                         range(antonym_batch_counter * self.batch_size,
+                                               (antonym_batch_counter + 1) * self.batch_size)]
                     current_negatives = self.extract_negative_examples(antonymy_examples, attract_batch=False)
 
                     self.sess.run([self.repel_cost_step], feed_dict={self.repel_examples: antonymy_examples,
@@ -432,7 +432,7 @@ class ExperimentRun:
                                                                      self.repel_margin: self.repel_margin_value,
                                                                      self.regularisation_constant: self.regularisation_constant_value})
 
-                    antonym_counter += 1
+                    antonym_batch_counter += 1
 
             self.create_vector_dictionary()  # whether to print SimLex score at the end of each epoch
             self.current_iteration += 1
@@ -513,16 +513,6 @@ def mix_sampling(list_of_examples, negative_examples):
     return mixed_negative_examples
 
 
-def normalise_word_vectors(word_vectors, norm=1.0):
-    """
-    This method normalises the collection of word vectors provided in the word_vectors dictionary.
-    """
-    for word in word_vectors:
-        word_vectors[word] /= math.sqrt((word_vectors[word] ** 2).sum() + 1e-6)
-        word_vectors[word] = word_vectors[word] * norm
-    return word_vectors
-
-
 def load_word_vectors(file_destination,type='glove'):
     """
     This method loads the word vectors from the supplied file destination.
@@ -561,145 +551,8 @@ def load_word_vectors(file_destination,type='glove'):
     return word_dictionary
 
 
-
-
-
-# def simlex_analysis(word_vectors, language="english", source="simlex", add_prefixes=True):
-#     """
-#     This method computes the Spearman's rho correlation (with p-value) of the supplied word vectors.
-#     """
-#     pair_list = []
-#     config = configparser.RawConfigParser()
-#     config_filepath = join(ATTRACT_REPEL_DIR, "experiment_parameters.cfg")
-#     config.read(config_filepath)
-#     eval_dir = config.get("data","eval_dir_path")
-#     if source == "simlex":
-#         fread_simlex = codecs.open(join(eval_dir,"simlex-") + language + ".txt", 'r', 'utf-8')
-#     elif source == "simlex-old":
-#         fread_simlex = codecs.open(join(eval_dir,"simlex-english-old.txt"), 'r', 'utf-8')
-#     elif source == "simverb":
-#         fread_simlex = codecs.open(join(eval_dir,"simverb.txt"), 'r', 'utf-8')
-#     elif source == "wordsim":
-#         fread_simlex = codecs.open(join(eval_dir,"ws-353/wordsim353-") + language + ".txt", 'r',
-#                                    'utf-8')  # specify english, english-rel, etc.
-#
-#     # needed for prefixes if we are adding these.
-#     lp_map = {}
-#     lp_map["english"] = "en_"
-#     lp_map["german"] = "de_"
-#     lp_map["italian"] = "it_"
-#     lp_map["russian"] = "ru_"
-#     lp_map["croatian"] = "sh_"
-#     lp_map["hebrew"] = "he_"
-#
-#     line_number = 0
-#     for line in fread_simlex:
-#
-#         if line_number > 0:
-#
-#             tokens = line.split()
-#             word_i = tokens[0].lower()
-#             word_j = tokens[1].lower()
-#             score = float(tokens[2])
-#
-#             if add_prefixes:
-#                 word_i = lp_map[language] + word_i
-#                 word_j = lp_map[language] + word_j
-#
-#             if word_i in word_vectors and word_j in word_vectors:
-#                 pair_list.append(((word_i, word_j), score))
-#             else:
-#                 pass
-#
-#         line_number += 1
-#
-#     if not pair_list:
-#         return (0.0, 0)
-#
-#     pair_list.sort(key=lambda x: - x[1])
-#
-#     coverage = len(pair_list)
-#
-#     extracted_list = []
-#     extracted_scores = {}
-#
-#     for (x, y) in pair_list:
-#         (word_i, word_j) = x
-#         current_distance = distance(word_vectors[word_i], word_vectors[word_j])
-#         extracted_scores[(word_i, word_j)] = current_distance
-#         extracted_list.append(((word_i, word_j), current_distance))
-#
-#     extracted_list.sort(key=lambda x: x[1])
-#
-#     spearman_original_list = []
-#     spearman_target_list = []
-#
-#     for position_1, (word_pair, score_1) in enumerate(pair_list):
-#         score_2 = extracted_scores[word_pair]
-#         position_2 = extracted_list.index((word_pair, score_2))
-#         spearman_original_list.append(position_1)
-#         spearman_target_list.append(position_2)
-#
-#     spearman_rho = spearmanr(spearman_original_list, spearman_target_list)
-#     return round(spearman_rho[0], 3), coverage
-
-
 def normalise_vector(v1):
     return v1 / norm(v1)
-
-
-def distance(v1, v2, normalised_vectors=False):
-    """
-    Returns the cosine distance between two vectors.
-    If the vectors are normalised, there is no need for the denominator, which is always one.
-    """
-    if normalised_vectors:
-        return 1 - dot(v1, v2)
-    else:
-        return 1 - dot(v1, v2) / (norm(v1) * norm(v2))
-
-
-# def simlex_scores(word_vectors, print_simlex=True):
-#     for language in ["english"]:
-#
-#         simlex_score, simlex_coverage = simlex_analysis(word_vectors, language,add_prefixes=False)
-#
-#         if language not in ["hebrew", "croatian"]:
-#             ws_score, ws_coverage = simlex_analysis(word_vectors, language, source="wordsim",add_prefixes=False)
-#         else:
-#             ws_score = 0.0
-#             ws_coverage = 0
-#
-#         if language == "english":
-#             simverb_score, simverb_coverage = simlex_analysis(word_vectors, language, source="simverb",add_prefixes=False)
-#
-#         if simlex_coverage > 0:
-#
-#             if print_simlex:
-#
-#                 if language == "english":
-#
-#                     simlex_old, cov_old = simlex_analysis(word_vectors, language, source="simlex-old",add_prefixes=False)
-#
-#                     print("SimLex score for", language, "is:", simlex_score, "Original SimLex score is:", simlex_old,
-#                           "coverage:", simlex_coverage, "/ 999")
-#                     print("SimVerb score for", language, "is:", simverb_score, "coverage:", simverb_coverage, "/ 3500")
-#                     print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
-#
-#                 elif language in ["italian", "german", "russian"]:
-#
-#                     print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999")
-#                     print("WordSim score for", language, "is:", ws_score, "coverage:", ws_coverage, "/ 353\n")
-#
-#                 elif language in ["hebrew", "croatian"]:
-#
-#                     print("SimLex score for", language, "is:", simlex_score, "coverage:", simlex_coverage, "/ 999\n")
-#
-#         if language == "english":
-#             simlex_score_en = simlex_score
-#             ws_score_en = ws_score
-#
-#     return simlex_score_en, ws_score_en
 
 
 def run_experiment(config):

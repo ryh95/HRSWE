@@ -16,10 +16,6 @@ import sys
 
 class Dataset(object):
 
-    def __init__(self,thesauri):
-
-        self.thesauri = thesauri
-
     def load_SimVerb3500(self, simverb_fname):
         X, y = [], []
         with open(simverb_fname, 'r') as f:
@@ -69,7 +65,7 @@ class Dataset(object):
             for line in ant_pairs:
                 f_ant_out.write(line)
 
-    def generate_adv_thesaurus2(self,ratio):
+    def generate_adv_thesaurus2(self,ratio,thesauri):
         task_tuples = set()
         reverse_task_tuples = set()
         for k,v in self.sim_tasks.items():
@@ -77,12 +73,12 @@ class Dataset(object):
            reverse_task_tuples |= set(tuple(x[::-1]) for x in v['X'])
 
         syn_pairs, ant_pairs = set(), set()
-        with open(self.thesauri['syn_fname'], 'r') as f_syn:
+        with open(thesauri['syn_fname'], 'r') as f_syn:
             for line in f_syn:
                 word_pair = line.split()
                 word_pair = tuple(word[3:] for word in word_pair)  # remove the 'en-' prefix
                 syn_pairs.add(word_pair)
-        with open(self.thesauri['ant_fname'], 'r') as f_ant:
+        with open(thesauri['ant_fname'], 'r') as f_ant:
             for line in f_ant:
                 word_pair = line.split()
                 word_pair = tuple(word[3:] for word in word_pair)  # remove the 'en-' prefix
@@ -100,11 +96,11 @@ class Dataset(object):
         ant_pairs |= subset
 
         # write into files
-        pa,fname = path.split(self.thesauri['syn_fname'])
+        pa,fname = path.split(thesauri['syn_fname'])
         with open(join(pa,'adv_'+fname), 'w') as f_syn_out:
             for line in syn_pairs:
                 f_syn_out.write(' '.join('en_'+w for w in line)+'\n')
-        pa, fname = path.split(self.thesauri['ant_fname'])
+        pa, fname = path.split(thesauri['ant_fname'])
         with open(join(pa,'adv_'+fname), 'w') as f_ant_out:
             for line in ant_pairs:
                 f_ant_out.write(' '.join('en_'+w for w in line)+'\n')
@@ -185,11 +181,11 @@ class Dataset(object):
 
         self.emb_dict = emb_dict
 
-    def generate_syn_ant_graph(self):
+    def generate_syn_ant_graph(self,thesauri):
         G = nx.Graph()
         G.add_nodes_from(self.words)
         words_set = set(self.words)
-        if 'syn_fname' not in self.thesauri or 'ant_fname' not in self.thesauri:
+        if 'syn_fname' not in thesauri or 'ant_fname' not in thesauri:
             # ref: https://stackoverflow.com/a/2950027
             sys.exit('No thesauri found!')
         # if thesauri['name'] == 'word_sim':
@@ -200,7 +196,7 @@ class Dataset(object):
         #         elif y < 2:
         #             G.add_edge(w1, w2, weight=-1)
         syn_constraints = set()
-        with open(self.thesauri['syn_fname'], 'r') as f:
+        with open(thesauri['syn_fname'], 'r') as f:
             for line in f:
                 word_pair = line.split()
                 word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
@@ -208,7 +204,7 @@ class Dataset(object):
                     syn_constraints |= {(word_pair[0], word_pair[1])}
 
         ant_constraints = set()
-        with open(self.thesauri['ant_fname'], 'r') as f:
+        with open(thesauri['ant_fname'], 'r') as f:
             for line in f:
                 word_pair = line.split()
                 word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix

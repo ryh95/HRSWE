@@ -1,13 +1,14 @@
 import pickle
 import time
 from collections import defaultdict
+from os.path import join
 
 from scipy import linalg
 from web.embedding import Embedding
 import numpy as np
 # import cvxpy as cp
-import plotly.graph_objs as go
-from plotly.offline import plot
+
+from constants import WORD_SIM_TASK_DIR
 
 
 class BaseExperiments(object):
@@ -37,7 +38,7 @@ class BaseExperiments(object):
         results['beta_range2'] = beta2s
 
         cur_best_score = -np.inf
-        adj_pos, adj_neg = self.dataset.generate_syn_ant_graph()
+        adj_pos, adj_neg = self.dataset.generate_syn_ant_graph(config['thesauri'])
         times = []
         for beta1 in beta1s:
             for beta2 in beta2s:
@@ -64,7 +65,11 @@ class BaseExperiments(object):
         with open(self.results_fname + '.pickle', 'wb') as handle:
             pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks, results["best_scored_emb"])
+        f = open(join(WORD_SIM_TASK_DIR,'results.txt'),'w')
+        results = self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks, results["best_scored_emb"], f)
+        f.close()
+        return results
+
 
     def run_InjectedMatrix(self,*hyps):
 
@@ -117,43 +122,8 @@ class BaseExperiments(object):
         # eval the ar specialized embedding
         with open(config.get('data','output_filepath'), 'rb') as handle:
             emb_dict = pickle.load(handle)
-        self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks,emb_dict)
 
-    def draw_HRSWE_dev_results(self):
-
-        # results['benchmark_scores'] = benchmark_scores
-        with open(self.results_fname + '.pickle', 'rb') as handle:
-            results = pickle.load(handle)
-        self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks, results["best_scored_emb"])
-
-        results_trace = []
-        # benchmark_scores_trace = []
-        x_grid, y_grid = np.meshgrid(results['beta_range1'], results['beta_range2'])
-        n = results['beta_range1'].size
-        for name in ["SIMVERB500-dev"]:
-            z_grid = np.array(results[name + '_scores']).reshape(n, n).T
-            results_trace.append(
-                go.Surface(
-                    x=x_grid,
-                    y=y_grid,
-                    z=z_grid,
-                    # mode='lines+markers',
-                    name='LHRSWE'  # 'HRSWE'
-                )
-            )
-
-        # for name in task_names:
-        #     benchmark_scores_trace.append(
-        #         go.Scatter(
-        #             x=results['beta_range'],
-        #             y=[results['benchmark_scores'][name]] * len(results['beta_range']),
-        #             mode='lines+markers',
-        #             name='SGNS-GN'
-        #         )
-        #     )
-
-        plot({
-            "data": results_trace,
-            # "data": results_trace + benchmark_scores_trace,
-            "layout": go.Layout(),
-        }, filename=self.results_fname + '.html')
+        f = open(join(WORD_SIM_TASK_DIR,'results.txt'),'a')
+        results = self.evaluator.eval_emb_on_sim(self.dataset.sim_tasks, emb_dict,f)
+        f.close()
+        return results

@@ -1,8 +1,12 @@
+import pickle
+import sys
 from configparser import ConfigParser
-
+import numpy as np
 import scipy
 from six import iteritems
 from web.evaluate import evaluate_similarity
+import plotly.graph_objs as go
+from plotly.offline import plot
 
 
 class evaluator(object):
@@ -24,12 +28,12 @@ class evaluator(object):
             with open('best_AR_parameters.cfg', 'w') as configfile:
                 model.config.write(configfile)
 
-    def eval_emb_on_sim(self, tasks, emb_obj):
+    def eval_emb_on_sim(self, tasks, emb_obj, file=sys.stdout):
         scores = {}
         print('*' * 30)
         for name, data in iteritems(tasks):
             score = evaluate_similarity(emb_obj, data.X, data.y)
-            print("Spearman correlation of scores on {} {}".format(name, score))
+            print("Spearman correlation of scores on {} {}".format(name, score),file=file)
             scores[name] = score
         return scores
 
@@ -42,3 +46,42 @@ class evaluator(object):
             print("Spearman correlation of scores on {} {}".format(name, score))
             scores[name] = score
         return scores
+
+    def draw_HRSWE_dev_results(self,results_fname,sim_tasks):
+
+        # results['benchmark_scores'] = benchmark_scores
+        with open(results_fname + '.pickle', 'rb') as handle:
+            results = pickle.load(handle)
+        self.eval_emb_on_sim(sim_tasks, results["best_scored_emb"])
+
+        results_trace = []
+        # benchmark_scores_trace = []
+        x_grid, y_grid = np.meshgrid(results['beta_range1'], results['beta_range2'])
+        n = results['beta_range1'].size
+        for name in ["SIMVERB500-dev"]:
+            z_grid = np.array(results[name + '_scores']).reshape(n, n).T
+            results_trace.append(
+                go.Surface(
+                    x=x_grid,
+                    y=y_grid,
+                    z=z_grid,
+                    # mode='lines+markers',
+                    name='LHRSWE'  # 'HRSWE'
+                )
+            )
+
+        # for name in task_names:
+        #     benchmark_scores_trace.append(
+        #         go.Scatter(
+        #             x=results['beta_range'],
+        #             y=[results['benchmark_scores'][name]] * len(results['beta_range']),
+        #             mode='lines+markers',
+        #             name='SGNS-GN'
+        #         )
+        #     )
+
+        plot({
+            "data": results_trace,
+            # "data": results_trace + benchmark_scores_trace,
+            "layout": go.Layout(),
+        }, filename='results' + '.html')
