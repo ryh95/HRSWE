@@ -438,7 +438,8 @@ class ExperimentRun:
             self.current_iteration += 1
             # eval sp word vectors
             if evaluator is not None:
-                evaluator.eval_AR(self.word_vectors, self)
+                evaluator.eval_emb_on_tasks(self.word_vectors)
+                evaluator.update_AR_results(self)
 
         print("Training took ", round(time.time() - start, 1), "seconds.")
 
@@ -467,7 +468,7 @@ class ExperimentRun:
         f_write = codecs.open(write_path, 'w', 'utf-8')
 
         head, tail = os.path.split(write_path)
-        type = tail.split('.')[1]
+        type = tail.split('.')[-1]
 
         if type == 'txt':
 
