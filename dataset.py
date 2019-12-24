@@ -41,7 +41,6 @@ class Dataset(object):
         else:
             self.vocab_fname = 'syn_ant_classify_test_val'
         self.tasks = tasks
-        self.val_tasks = {k:v for k,v in tasks if 'dev' or 'val' in k}
 
 
     def load_words(self):
@@ -83,16 +82,14 @@ class Dataset(object):
         emb_fname = join(ORIGINAL_VECS_DIR, self.vocab_fname)
         # self.emb_fname = 'paper_results/wn_ro_pd_ld_0'
 
-        if os.path.isfile(emb_fname + '.pickle'):
-            with open(emb_fname + '.pickle', 'rb') as handle:
-                emb_dict = pickle.load(handle)
-
+        if os.path.isfile(emb_fname + '.npy'):
+            emb = np.load(emb_fname + '.npy')
         else:
             text_preprocesser = GeneralTextProcesser()
-            emb_dict = text_preprocesser.vocab2vec(self.words, ORIGINAL_VECS_DIR, self.vocab_fname, ORIGINAL_EMBEDDING,
+            _,emb = text_preprocesser.vocab2vec(self.words, ORIGINAL_VECS_DIR, self.vocab_fname, ORIGINAL_EMBEDDING,
                                                    ['pickle'], 'word2vec', normalize=True, oov_handle='mean_emb_vec')
-
-        self.emb_dict = emb_dict
+        # nxd
+        self.emb = emb
 
     def load_thesauri(self, fthesauri):
         '''

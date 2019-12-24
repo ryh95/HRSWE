@@ -16,34 +16,40 @@ from abc import ABC, abstractmethod
 class Evaluator(ABC):
 
     def __init__(self,tasks):
-        self.best_eval_score = -inf
-        self.cur_eval_score = inf
+        self.cur_score = None
         self.cur_results = {}
+        self.best_score = -inf
+        self.best_results = {}
         self.tasks = tasks
 
     def update_AR_results(self, model):
-        if self.cur_eval_score > self.best_eval_score:
+        if self.cur_score > self.best_score:
             # save specialized vectors
             model.print_word_vectors(model.word_vectors, model.output_filepath)
-            self.best_eval_score = self.cur_eval_score
-            print('Current best eval score: %f' % (self.best_eval_score))
+            self.best_score = self.cur_score
+            print('Current best eval score: %f' % (self.best_score))
             print('Writing best parameters to cfg')
             model.config.set('hyperparameters', 'curr_iter', model.current_iteration)
             with open('best_AR_parameters.cfg', 'w') as configfile:
                 model.config.write(configfile)
 
     def update_HRSWE_results(self,model_results):
-        if self.cur_eval_score > self.best_eval_score:
+        if self.cur_score > self.best_score:
             # save specialized vectors
-            self.best_eval_score = self.cur_eval_score
-            print('Current best eval score: %f' % (self.best_eval_score))
+            self.best_score = self.cur_score
+            print('Current best eval score: %f' % (self.best_score))
             print('Writing best parameters to cfg')
             for k,v in self.cur_results:
                 model_results['best_'+k] = v
             return model_results
 
+    def update_results(self):
+
+        #todo: finish this!
+        pass
+
     @abstractmethod
-    def eval_emb_on_tasks(self, emb_obj, file):
+    def eval_emb_on_tasks(self, emb_dict, file):
         pass
 
 
@@ -61,15 +67,16 @@ class Evaluator(ABC):
 
 class WordSimEvaluator(Evaluator):
 
-    def eval_emb_on_tasks(self, emb_obj, file=sys.stdout):
-        scores = {}
+    def eval_emb_on_tasks(self, emb_dict, file=sys.stdout):
+        results = {}
         print('*' * 30)
         for name, data in iteritems(self.tasks):
-            score = evaluate_similarity(emb_obj, data.X, data.y)
+            score = evaluate_similarity(emb_dict, data.X, data.y)
             print("Spearman correlation of scores on {} {}".format(name, score),file=file)
-            scores[name] = score
-        self.cur_eval_score = scores
-        return scores
+            results[name] = score
+        self.cur_score = results['SIMVERB500-dev']
+        self.cur_results = results
+        return self.cur_score, self.cur_results
 
     def draw_HRSWE_dev_results(self,results_fname,sim_tasks):
 
@@ -111,11 +118,11 @@ class SynAntClyEvaluator(Evaluator):
         list_results = Parallel(n_jobs=4)(delayed(self.__eval_emb_with_th)(emb_dict, th) for th in self.ths)
         # save and print scores that have the highest total f1
         best_results = max(list_results,key=lambda x: x[0])
-        self.cur_eval_score = best_results[0]
+        self.cur_score = best_results[0]
         self.cur_results = best_results[1]
         for k,v in self.cur_results.items():
             print('%s: %f' % (k.split('-')[0], v), file=f)
-        return best_results[1]
+        return self.cur_score, self.cur_results
 
     def __eval_emb_with_th(self, emb_dict, th):
         results = {}

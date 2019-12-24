@@ -13,13 +13,18 @@ import tensorflow as tf
 
 class HRSWE(object):
 
-    def __init__(self,beta1, beta2, **config):
+    def __init__(self, *hyps, **config):
+
+        beta1, beta2 = hyps
 
         self.beta1 = beta1
         self.beta2 = beta2
-        self.config = config
 
-    def specialize_emb(self,emb,adj_pos,adj_neg):
+        self.config = config
+        self.adj_pos = config['adj_pos']
+        self.adj_neg = config['adj_neg']
+
+    def specialize_emb(self,emb):
         """
         Dynamic Adjusted Word Embedding
 
@@ -30,13 +35,13 @@ class HRSWE(object):
         :param dict config:  keys, [sim_mat_type(pd/n, n means normal), eig_vec_option(ld, largest eig value),
         emb_type]
 
-        :return: dxn ndarray new word embedding
+        :return: nxd ndarray new word embedding
         """
 
         d, n = emb.shape
         W = emb.T @ emb
 
-        W_prime = W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
+        W_prime = W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) + self.beta2 * self.adj_neg.multiply(W - np.min(W))
 
         if self.config['sim_mat_type'] == 'pd':
             W_hat = nearestPD(W_prime)
@@ -57,24 +62,26 @@ class HRSWE(object):
         # elif config['emb_type'] == 2: # together use with n
         #     assert np.all(lamb_s) >= 0
         #     new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
-        return new_emb.T
+        return new_emb
 
 class AR(object):
 
-    def __init__(self, syn_mar,ant_mar,batch_size,epoch_num,l2_reg,**config):
+    def __init__(self, *hyps, **config):
         """
         To initialise the class, we need to supply the config file, which contains the location of
         the pretrained (distributional) word vectors, the location of (potentially more than one)
         collections of linguistic constraints (one pair per line), as well as the
         hyperparameters of the Attract-Repel procedure (as detailed in the TACL paper).
         """
-
+        syn_mar, ant_mar, batch_size, epoch_num, l2_reg = hyps
         self.attract_margin_value = syn_mar
         self.repel_margin_value = ant_mar
         self.regularisation_constant_value = l2_reg
         self.batch_size = batch_size
         self.max_iter = epoch_num
-        self.config = config
+
+        self.syn_pairs = config['syn_pairs']
+        self.ant_pairs = config['ant_pairs']
 
         print("\nExperiment hyperparameters (attract_margin, repel_margin, batch_size, l2_reg_constant, max_iter):", \
               self.attract_margin_value, self.repel_margin_value, self.batch_size, self.regularisation_constant_value,
@@ -289,7 +296,7 @@ class AR(object):
 
         return self.sess.run(self.W_dynamic)
 
-    def sepcialize_emb(self,emb,syn_pairs,ant_pairs):
+    def sepcialize_emb(self,emb):
 
         """
         This method repeatedly applies optimisation steps to fit the word vectors to the provided linguistic constraints.
@@ -324,10 +331,10 @@ class AR(object):
         # self.synonyms = list(self.synonyms)
         # self.antonyms = list(self.antonyms)
 
-        syn_count = len(syn_pairs)
-        ant_count = len(ant_pairs)
+        syn_count = len(self.syn_pairs)
+        ant_count = len(self.ant_pairs)
 
-        print("\nAntonym pairs:", len(ant_pairs), "Synonym pairs:", len(syn_pairs))
+        print("\nAntonym pairs:", len(self.ant_pairs), "Synonym pairs:", len(self.syn_pairs))
 
         syn_batches = int(syn_count / self.batch_size)
         ant_batches = int(ant_count / self.batch_size)
@@ -372,7 +379,7 @@ class AR(object):
                 if syn_or_ant_batch == 0:
                     # do one synonymy batch:
 
-                    synonymy_examples = [syn_pairs[order_of_synonyms[x]] for x in
+                    synonymy_examples = [self.syn_pairs[order_of_synonyms[x]] for x in
                                          range(synonym_batch_counter * self.batch_size,
                                                (synonym_batch_counter + 1) * self.batch_size)]
                     current_negatives = self.extract_negative_examples(synonymy_examples, attract_batch=True)
@@ -385,7 +392,7 @@ class AR(object):
 
                 else:
 
-                    antonymy_examples = [ant_pairs[order_of_antonyms[x]] for x in
+                    antonymy_examples = [self.ant_pairs[order_of_antonyms[x]] for x in
                                          range(antonym_batch_counter * self.batch_size,
                                                (antonym_batch_counter + 1) * self.batch_size)]
                     current_negatives = self.extract_negative_examples(antonymy_examples, attract_batch=False)

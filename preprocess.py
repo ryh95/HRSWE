@@ -172,7 +172,7 @@ class GeneralTextProcesser(object):
                 with open(join(output_dir,output_name+'.pickle'), 'wb') as handle:
                     pickle.dump(word2vec, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        return word2vec
+        return word2vec,vocab_vec.T
 
     def normalize(self,words):
         # TODO: remove non ascii if you don't need ascii
