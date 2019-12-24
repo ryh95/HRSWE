@@ -127,22 +127,23 @@ def test_on_gre(fname,emb_obj):
     return p,r,f1
 
 
-def generate_sub_thesauri(syn_ant_fname, vocab):
+def generate_sub_thesauri(in_fthesauri, out_fthesauri, vocab):
     '''
     select a subset of thesaurus that all thesauri words are in vocab
-    :param syn_ant_fname:
+    :param in_fthesauri:
     :param out_fname:
     :param vocab: set
     :return:
     '''
-    head, input_fname = os.path.split(syn_ant_fname)
-    out_fname = join(head, 'sub_' + input_fname)
-    with open(syn_ant_fname,'r') as f,\
-         open(out_fname,'w') as f_out:
-        for line in f:
-            w1,w2 = line.strip().split()
-            if w1[3:] in vocab and w2[3:] in vocab:
-                f_out.write(w1+' '+w2+'\n')
+    if os.path.isfile(out_fthesauri):
+        print('sub thesauri has been generated! Quit')
+    else:
+        with open(in_fthesauri, 'r') as f,\
+             open(out_fthesauri,'w') as f_out:
+            for line in f:
+                w1,w2 = line.strip().split()
+                if w1[3:] in vocab and w2[3:] in vocab:
+                    f_out.write(w1+' '+w2+'\n')
 
 def get_all_words_in_constraint(word_sim_fname):
     vocab = set()

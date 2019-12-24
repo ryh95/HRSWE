@@ -1,6 +1,5 @@
 import pickle
 import sys
-from configparser import ConfigParser
 from math import inf
 
 import numpy as np
@@ -20,33 +19,17 @@ class Evaluator(ABC):
         self.cur_results = {}
         self.best_score = -inf
         self.best_results = {}
+        self.cur_emb = None
+        self.best_emb = None
         self.tasks = tasks
 
-    def update_AR_results(self, model):
-        if self.cur_score > self.best_score:
-            # save specialized vectors
-            model.print_word_vectors(model.word_vectors, model.output_filepath)
-            self.best_score = self.cur_score
-            print('Current best eval score: %f' % (self.best_score))
-            print('Writing best parameters to cfg')
-            model.config.set('hyperparameters', 'curr_iter', model.current_iteration)
-            with open('best_AR_parameters.cfg', 'w') as configfile:
-                model.config.write(configfile)
-
-    def update_HRSWE_results(self,model_results):
-        if self.cur_score > self.best_score:
-            # save specialized vectors
-            self.best_score = self.cur_score
-            print('Current best eval score: %f' % (self.best_score))
-            print('Writing best parameters to cfg')
-            for k,v in self.cur_results:
-                model_results['best_'+k] = v
-            return model_results
-
     def update_results(self):
+        if self.cur_score > self.best_score:
+            self.best_score = self.cur_score
+            self.best_results = self.cur_results
+            self.best_emb = self.cur_emb
+            print('Current best eval score: %f' % (self.best_score))
 
-        #todo: finish this!
-        pass
 
     @abstractmethod
     def eval_emb_on_tasks(self, emb_dict, file):
@@ -76,6 +59,7 @@ class WordSimEvaluator(Evaluator):
             results[name] = score
         self.cur_score = results['SIMVERB500-dev']
         self.cur_results = results
+        self.cur_emb = emb_dict
         return self.cur_score, self.cur_results
 
     def draw_HRSWE_dev_results(self,results_fname,sim_tasks):
@@ -112,14 +96,17 @@ class SynAntClyEvaluator(Evaluator):
     def __init__(self,tasks,ths):
         super(Evaluator, self).__init__(tasks)
         self.ths = ths
+        self.best_th = None
 
     def eval_emb_on_tasks(self, emb_dict, f=sys.stdout):
 
         list_results = Parallel(n_jobs=4)(delayed(self.__eval_emb_with_th)(emb_dict, th) for th in self.ths)
         # save and print scores that have the highest total f1
         best_results = max(list_results,key=lambda x: x[0])
+        self.best_th = self.ths[list_results.index(best_results)]
         self.cur_score = best_results[0]
         self.cur_results = best_results[1]
+        self.cur_emb = emb_dict
         for k,v in self.cur_results.items():
             print('%s: %f' % (k.split('-')[0], v), file=f)
         return self.cur_score, self.cur_results

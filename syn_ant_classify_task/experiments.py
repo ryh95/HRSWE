@@ -1,66 +1,56 @@
 import pickle
-import time
 from collections import defaultdict
 from math import inf
-from os.path import join
 
-from scipy import linalg
-from web.embedding import Embedding
 import numpy as np
-# import cvxpy as cp
 
-from constants import WORD_SIM_TASK_DIR, SYN_ANT_CLASSIFY_TASK_DIR
+from evaluate import SynAntClyEvaluator
 
 
 class BaseExperiments(object):
 
-    def __init__(self, dataset, HRSWE, AR, evaluator):
+    def __init__(self,model,val_evaluator,test_evaluator,dataset,config):
+
+        self.model = model
+        self.val_evaluator = val_evaluator
+        self.test_evaluator = test_evaluator
         self.dataset = dataset
-        self.HRSWE = HRSWE
-        self.AR = AR
-        self.evaluator = evaluator
+        self.config = config # model_config(HRSWE config),hyp_tune_config(opt_space, bayes func),exp_config(save_emb,exp_name)
 
-    def run_HRSWE(self, *hyps, **config):
-        beta1s,beta2s = hyps
-        self.results_fname = '_'.join([config['thesauri_name'], config['sim_mat_type'], config['eig_vec_option'], str(config['emb_type'])])
+    def get_val_score(self, feasible_point):
 
-        words_emb = [self.dataset.emb_dict[w] for w in self.dataset.words]
-        words_emb = np.vstack(words_emb).T
-        # words_emb = words_emb / linalg.norm(words_emb,axis=0)
+        model = self.model(*feasible_point,**self.config['model_config'])
+        sp_emb = model.specialize_emb(self.dataset.emb)
+        sp_emb_dict = {w:sp_emb[i,:] for i,w in enumerate(self.dataset.words)}
+        score,_ = self.val_evaluator.eval_emb_on_tasks(sp_emb_dict)
+        self.val_evaluator.update_results()
 
-        results = {}
-        results['beta1s'] = beta1s
-        results['beta2s'] = beta2s
+        return score
 
-        results['best_total_f1'] = -np.inf
-        adj_pos, adj_neg = self.dataset.generate_syn_ant_graph()
-        times = []
+    def run(self):
 
-        for beta1 in beta1s:
-            for beta2 in beta2s:
-                last_time = time.time()
-                model = self.HRSWE(beta1, beta2, words_emb, adj_pos, adj_neg, config)
-                emb = model.specialize_emb()
-                time_spend = round(time.time() - last_time, 1)
-                times.append(time_spend)
-                print('Time took: ', time_spend)
-                emb_dict = {w: emb[:, i] for i, w in enumerate(self.dataset.words)}
-                results['best_hyps'] = [beta1, beta2]
+        hyp_tune_func = self.config['hyp_tune_config']['tune_func']
+        res = hyp_tune_func(self.get_val_score, self.config['hyp_tune_config']['opt_space'],
+                                 **self.config['hyp_tune_config'])
 
-                self.evaluator.eval_emb_on_tasks(emb_dict)
-                results = self.evaluator.update_HRSWE_results(results)
+        best_emb_dict = self.val_evaluator.best_results['emb_dict']
+        score, test_res = self.test_evaluator.eval_emb_on_tasks(best_emb_dict)
 
-        print('Average time spent: ', round(sum(times) / len(times), 1))
+        if self.config['exp_config']['save_res']:
+            final_res = {
+                'best_emb_dict':best_emb_dict,
+                'test_res':test_res,
+                'best_val_res':self.val_evaluator.best_results,
+                'best_hyps':res.x,
+                'config':self.config
+            }
+            if isinstance(self.test_evaluator,SynAntClyEvaluator):
+                final_res['best_th'] = self.test_evaluator.best_th
 
-        with open(self.results_fname + '.pickle', 'wb') as handle:
-            pickle.dump(results, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with open(self.config['exp_config']['exp_name']+'_results' + '.pickle', 'wb') as handle:
+                pickle.dump(final_res, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-        f = open(join(SYN_ANT_CLASSIFY_TASK_DIR,'results.txt'),'w')
-        self.evaluator.tasks = self.dataset.tasks
-        final_results = self.evaluator.eval_emb_on_tasks(results['best_emb'], f)
-        f.close()
-        return final_results
-
+        return score
 
     def run_InjectedMatrix(self,*hyps):
         # todo: refactor this function latter
@@ -98,24 +88,3 @@ class BaseExperiments(object):
                     cur_best_score = scores['SIMVERB500-dev']
 
         self.evaluator.eval_injected_matrix(self.dataset.sim_tasks,results['best_matrix'],words2id)
-
-    def run_AR(self, config, *hyps):
-
-        synonym_margins,antonym_margins = hyps
-        for s_m in synonym_margins:
-            for a_m in antonym_margins:
-                config.set('hyperparameters', 'attract_margin', s_m)
-                config.set('hyperparameters', 'repel_margin', a_m)
-
-                model = self.AR(config)
-                model.attract_repel(self.evaluator)
-
-        # eval the ar specialized embedding
-        with open(config.get('data','output_filepath'), 'rb') as handle:
-            emb_dict = pickle.load(handle)
-
-        f = open(join(SYN_ANT_CLASSIFY_TASK_DIR,'results.txt'),'a')
-        self.evaluator.tasks = self.dataset.tasks
-        final_results = self.evaluator.eval_emb_on_tasks(emb_dict,f)
-        f.close()
-        return final_results

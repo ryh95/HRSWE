@@ -87,7 +87,7 @@ class Dataset(object):
         else:
             text_preprocesser = GeneralTextProcesser()
             _,emb = text_preprocesser.vocab2vec(self.words, ORIGINAL_VECS_DIR, self.vocab_fname, ORIGINAL_EMBEDDING,
-                                                   ['pickle'], 'word2vec', normalize=True, oov_handle='mean_emb_vec')
+                                                   ['pickle','npy'], 'word2vec', normalize=True, oov_handle='mean_emb_vec')
         # nxd
         self.emb = emb
 
@@ -126,11 +126,14 @@ class Dataset(object):
                     self.ant_constraints |= {(word_pair[0], word_pair[1])}
 
         # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
-        # to be consistent with attract_repel's processing
-        # todo: tune the following
+        # this is what ar used
+        # todo: try another option: remove the intersect from both constraints
         for antonym_pair in self.ant_constraints:
             if antonym_pair in self.syn_constraints:
                 self.syn_constraints.remove(antonym_pair)
+
+        self.syn_constraints = list(self.syn_constraints)
+        self.ant_constraints = list(self.ant_constraints)
 
     def generate_syn_ant_graph(self):
         '''
@@ -145,7 +148,7 @@ class Dataset(object):
         G.add_weighted_edges_from(positive_edges)
         # If a pair of words has positive edge and negative edge, the positive edge will be removed
         # then the previous post-processing step can be removed
-        # todo: tune the following
+        # todo: try use two graphs
         G.add_weighted_edges_from(negative_edges)
 
         adj = nx.adjacency_matrix(G, nodelist=self.words)

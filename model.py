@@ -319,17 +319,9 @@ class AR(object):
         # specialize embedding
         current_iteration = 0
 
-        # todo: do post-processing outside and remove the following
-        # # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
-        # for antonym_pair in self.antonyms:
-        #     if antonym_pair in self.synonyms:
-        #         self.synonyms.remove(antonym_pair)
 
         # TODO: if a pair (w_a,w_b) is in synonyms, (w_b,w_a) can also in synonyms.
         # figure out how many pairs have this problem
-
-        # self.synonyms = list(self.synonyms)
-        # self.antonyms = list(self.antonyms)
 
         syn_count = len(self.syn_pairs)
         ant_count = len(self.ant_pairs)
