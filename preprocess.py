@@ -162,7 +162,7 @@ class GeneralTextProcesser(object):
             vocab_vec[:, vocab_vec_ind] = np.repeat(mean_emb_vec[:,np.newaxis],n_oov,1)
         print('saving vocab vector file')
 
-        word2vec = {word: vocab_vec[:, id] for id, word in enumerate(vocab)}
+        word2vec = OrderedDict((word, vocab_vec[:, id]) for id, word in enumerate(vocab))
         for fmt in savefmt:
             if fmt == 'mat':
                 sio.savemat(join(output_dir,output_name+'.mat'),{output_name:vocab_vec})

@@ -94,29 +94,28 @@ class WordSimEvaluator(Evaluator):
 class SynAntClyEvaluator(Evaluator):
 
     def __init__(self,tasks,ths):
-        super(Evaluator, self).__init__(tasks)
+        super().__init__(tasks)
         self.ths = ths
-        self.best_th = None
 
     def eval_emb_on_tasks(self, emb_dict, f=sys.stdout):
 
-        list_results = Parallel(n_jobs=4)(delayed(self.__eval_emb_with_th)(emb_dict, th) for th in self.ths)
+        list_results = Parallel(n_jobs=10)(delayed(self.__eval_emb_with_th)(emb_dict, th) for th in self.ths)
         # save and print scores that have the highest total f1
         best_results = max(list_results,key=lambda x: x[0])
-        self.best_th = self.ths[list_results.index(best_results)]
         self.cur_score = best_results[0]
         self.cur_results = best_results[1]
         self.cur_emb = emb_dict
         for k,v in self.cur_results.items():
-            print('%s: %f' % (k.split('-')[0], v), file=f)
+            print('%s: %f' % (k, v), file=f)
         return self.cur_score, self.cur_results
 
     def __eval_emb_with_th(self, emb_dict, th):
         results = {}
+        results['th'] = th
         total_f1 = 0
-        for name, data in self.tasks:
-            A = np.vstack(emb_dict[word] for word in data.X[:, 0])
-            B = np.vstack(emb_dict[word] for word in data.X[:, 1])
+        for name, data in self.tasks.items():
+            A = np.vstack([emb_dict[word] for word in data.X[:, 0]])
+            B = np.vstack([emb_dict[word] for word in data.X[:, 1]])
             sim = np.array([v1.dot(v2.T) / (np.linalg.norm(v1) * np.linalg.norm(v2)) for v1, v2 in zip(A, B)])
 
             y_preds = (sim < th).astype(int)
@@ -124,7 +123,6 @@ class SynAntClyEvaluator(Evaluator):
             results[name + '_p'] = p
             results[name + '_r'] = r
             results[name + '_f1'] = f1
-            results['th'] = th
             total_f1 += f1
         results['total_f1'] = total_f1
         return total_f1,results

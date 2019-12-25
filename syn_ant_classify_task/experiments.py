@@ -17,23 +17,24 @@ class BaseExperiments(object):
         self.dataset = dataset
         self.config = config # model_config(HRSWE config),hyp_tune_config(opt_space, bayes func),exp_config(save_emb,exp_name)
 
-    def get_val_score(self, feasible_point):
+    def get_val_score(self, feasible_hyps):
 
-        model = self.model(*feasible_point,**self.config['model_config'])
-        sp_emb = model.specialize_emb(self.dataset.emb)
+        model = self.model(*feasible_hyps)
+        sp_emb = model.specialize_emb(self.dataset.emb_dict,
+                                      self.dataset.syn_pairs,self.dataset.ant_pairs)
         sp_emb_dict = {w:sp_emb[i,:] for i,w in enumerate(self.dataset.words)}
         score,_ = self.val_evaluator.eval_emb_on_tasks(sp_emb_dict)
         self.val_evaluator.update_results()
 
-        return score
+        return -score # minimize to optimize
 
     def run(self):
 
-        hyp_tune_func = self.config['hyp_tune_config']['tune_func']
-        res = hyp_tune_func(self.get_val_score, self.config['hyp_tune_config']['opt_space'],
-                                 **self.config['hyp_tune_config'])
+        hyp_tune_func = self.config['hyp_tune_func']
+        res = hyp_tune_func(self.get_val_score, self.config['hyp_opt_space'],
+                                 **self.config['tune_func_config'])
 
-        best_emb_dict = self.val_evaluator.best_results['emb_dict']
+        best_emb_dict = self.val_evaluator.best_emb
         score, test_res = self.test_evaluator.eval_emb_on_tasks(best_emb_dict)
 
         if self.config['exp_config']['save_res']:
@@ -45,7 +46,7 @@ class BaseExperiments(object):
                 'config':self.config
             }
             if isinstance(self.test_evaluator,SynAntClyEvaluator):
-                final_res['best_th'] = self.test_evaluator.best_th
+                final_res['best_th'] = test_res['th']
 
             with open(self.config['exp_config']['exp_name']+'_results' + '.pickle', 'wb') as handle:
                 pickle.dump(final_res, handle, protocol=pickle.HIGHEST_PROTOCOL)

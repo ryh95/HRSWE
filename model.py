@@ -1,6 +1,7 @@
 import random
 import time
 
+import networkx as nx
 import numpy as np
 
 
@@ -13,18 +14,14 @@ import tensorflow as tf
 
 class HRSWE(object):
 
-    def __init__(self, *hyps, **config):
+    def __init__(self, *hyps):
 
         beta1, beta2 = hyps
 
         self.beta1 = beta1
         self.beta2 = beta2
 
-        self.config = config
-        self.adj_pos = config['adj_pos']
-        self.adj_neg = config['adj_neg']
-
-    def specialize_emb(self,emb):
+    def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
         """
         Dynamic Adjusted Word Embedding
 
@@ -37,36 +34,62 @@ class HRSWE(object):
 
         :return: nxd ndarray new word embedding
         """
+        words = [w for w in emb_dict.keys()]
+        emb = [vec for vec in emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32).T
 
         d, n = emb.shape
         W = emb.T @ emb
 
-        W_prime = W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) + self.beta2 * self.adj_neg.multiply(W - np.min(W))
+        adj_pos,adj_neg = self.generate_syn_ant_graph(words,syn_pairs,ant_pairs)
 
-        if self.config['sim_mat_type'] == 'pd':
-            W_hat = nearestPD(W_prime)
-        elif self.config['sim_mat_type'] == 'n':
-            W_hat = W_prime
+        W_prime = W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
 
-        if self.config['eig_vec_option'] == 'ld':
-            # choose d largest eigenvectors
-            # ref: https://stackoverflow.com/a/12168664
-            # turbo: use divide and conquer algorithm or not
-            lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
+        W_hat = nearestPD(W_prime)
 
-        if self.config['emb_type'] == 0:  # together use with pd
-            new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
-        elif self.config['emb_type'] == 1:  # together use with n
-            row_norm = np.linalg.norm(Q_s, axis=1)[:, np.newaxis]
-            new_emb = Q_s / row_norm
-        # elif config['emb_type'] == 2: # together use with n
-        #     assert np.all(lamb_s) >= 0
-        #     new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
+        # choose d largest eigenvectors
+        # ref: https://stackoverflow.com/a/12168664
+        # turbo: use divide and conquer algorithm or not
+        lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
+
+        new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
+
         return new_emb
+
+    def generate_syn_ant_graph(self,words,syn_pairs,ant_pairs):
+        '''
+        add words as nodes, use thesauri to add 1/-1 edges to nodes
+        :return: adj graph of the positive and negative graph
+        '''
+        G = nx.Graph()
+        G.add_nodes_from(words)
+
+        positive_edges = ((k, v, 1) for k, v in syn_pairs)
+        negative_edges = ((k, v, -1) for k, v in ant_pairs)
+        G.add_weighted_edges_from(positive_edges)
+        # If a pair of words has positive edge and negative edge, the positive edge will be removed
+        # then the previous post-processing step can be removed
+        # todo: try use two graphs
+        G.add_weighted_edges_from(negative_edges)
+
+        adj = nx.adjacency_matrix(G, nodelist=words)
+
+        adj_pos = adj.copy()
+        adj_pos[adj < 0] = 0
+        adj_pos.eliminate_zeros()
+
+        adj_neg = adj.copy()
+        adj_neg[adj > 0] = 0
+        adj_neg.eliminate_zeros()
+        return adj_pos,adj_neg
+
+class LHRSWE(object):
+    # todo: finish this if used
+    pass
 
 class AR(object):
 
-    def __init__(self, *hyps, **config):
+    def __init__(self, *hyps):
         """
         To initialise the class, we need to supply the config file, which contains the location of
         the pretrained (distributional) word vectors, the location of (potentially more than one)
@@ -79,9 +102,6 @@ class AR(object):
         self.regularisation_constant_value = l2_reg
         self.batch_size = batch_size
         self.max_iter = epoch_num
-
-        self.syn_pairs = config['syn_pairs']
-        self.ant_pairs = config['ant_pairs']
 
         print("\nExperiment hyperparameters (attract_margin, repel_margin, batch_size, l2_reg_constant, max_iter):", \
               self.attract_margin_value, self.repel_margin_value, self.batch_size, self.regularisation_constant_value,
@@ -296,11 +316,17 @@ class AR(object):
 
         return self.sess.run(self.W_dynamic)
 
-    def sepcialize_emb(self,emb):
+    def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
 
         """
         This method repeatedly applies optimisation steps to fit the word vectors to the provided linguistic constraints.
         """
+        emb = [vec for vec in emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32)
+
+        word2id = {w: i for i, w in enumerate(emb_dict.keys())}
+        self.syn_pairs = [(word2id[w1],word2id[w2]) for w1,w2 in syn_pairs]
+        self.ant_pairs = [(word2id[w1], word2id[w2]) for w1, w2 in ant_pairs]
 
         # load the handles so that we can load current state of vectors from the Tensorflow embedding.
         tf.reset_default_graph()

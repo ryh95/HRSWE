@@ -6,7 +6,7 @@ import numpy as np
 from constants import THESAURUS_DIR
 from dataset import Dataset
 from model import AR, HRSWE
-from syn_ant_classify_task.config import ori_thesauri, adv_thesauri, ths, ar_config
+from syn_ant_classify_task.config import ori_thesauri, adv_thesauri, ths, ar_config, hrswe_config
 from syn_ant_classify_task.experiments import BaseExperiments
 from utils import generate_adv3, generate_sub_thesauri
 from evaluate import Evaluator, SynAntClyEvaluator
@@ -14,30 +14,32 @@ from evaluate import Evaluator, SynAntClyEvaluator
 
 # load datasets
 dataset = Dataset()
-dataset.load_task_datasets(['adjective-pairs.val','noun-pairs.val','verb-pairs.val',
+dataset.load_task_datasets(*['adjective-pairs.val','noun-pairs.val','verb-pairs.val',
                             'adjective-pairs.test','noun-pairs.test','verb-pairs.test'])
 dataset.load_words()
 dataset.load_embeddings()
 
 
 val_tasks = {name:task for name,task in dataset.tasks.items() if 'val' in name}
+test_tasks = {name:task for name,task in dataset.tasks.items() if 'test' in name}
 generate_sub_thesauri(join(THESAURUS_DIR, 'synonyms.txt'),ori_thesauri['syn_fname'],set(dataset.words))
 generate_sub_thesauri(join(THESAURUS_DIR, 'antonyms.txt'),ori_thesauri['ant_fname'],set(dataset.words))
 
-for r in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]:
+for r in [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]:
+# for r in [0.1]:
     # prepare adv thesauri
     generate_adv3(r, ori_thesauri, dataset.tasks)
     dataset.load_thesauri(adv_thesauri)
 
     # evaluators
     hrswe_val = SynAntClyEvaluator(val_tasks, ths)
-    hrswe_test = SynAntClyEvaluator(dataset.tasks, ths)
+    hrswe_test = SynAntClyEvaluator(test_tasks, ths)
     ar_val = SynAntClyEvaluator(val_tasks, ths)
-    ar_test = SynAntClyEvaluator(dataset.tasks,ths)
+    ar_test = SynAntClyEvaluator(test_tasks,ths)
 
     # experiments
     ar_exp = BaseExperiments(AR,ar_val,ar_test,dataset,ar_config)
-    hrswe_exp = BaseExperiments(HRSWE,hrswe_val,hrswe_test,dataset,ar_config)
+    hrswe_exp = BaseExperiments(HRSWE,hrswe_val,hrswe_test,dataset,hrswe_config)
 
     # run exps
     ar_test_score = ar_exp.run()
@@ -49,7 +51,7 @@ for r in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]:
     np.save(hrswe_test_fscore, hrswe_test_score)
 
     # move files to dirs
-    ta_dir = join('results','adv_results','adv3',str(r))
+    ta_dir = join('results','adv','3',str(r))
     # create results dir
     Path(ta_dir).mkdir(parents=True, exist_ok=True)
     # move relevant files into results dir

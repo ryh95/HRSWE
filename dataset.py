@@ -82,14 +82,15 @@ class Dataset(object):
         emb_fname = join(ORIGINAL_VECS_DIR, self.vocab_fname)
         # self.emb_fname = 'paper_results/wn_ro_pd_ld_0'
 
-        if os.path.isfile(emb_fname + '.npy'):
-            emb = np.load(emb_fname + '.npy')
+        if os.path.isfile(emb_fname + '.pickle'):
+            with open(emb_fname + '.pickle','rb') as f:
+                emb_dict = pickle.load(f)
         else:
             text_preprocesser = GeneralTextProcesser()
-            _,emb = text_preprocesser.vocab2vec(self.words, ORIGINAL_VECS_DIR, self.vocab_fname, ORIGINAL_EMBEDDING,
+            emb_dict,_ = text_preprocesser.vocab2vec(self.words, ORIGINAL_VECS_DIR, self.vocab_fname, ORIGINAL_EMBEDDING,
                                                    ['pickle','npy'], 'word2vec', normalize=True, oov_handle='mean_emb_vec')
         # nxd
-        self.emb = emb
+        self.emb_dict = emb_dict
 
     def load_thesauri(self, fthesauri):
         '''
@@ -109,55 +110,28 @@ class Dataset(object):
         #             G.add_edge(w1, w2, weight=1)
         #         elif y < 2:
         #             G.add_edge(w1, w2, weight=-1)
-        self.syn_constraints = set()
+        self.syn_pairs = set()
         with open(fthesauri['syn_fname'], 'r') as f:
             for line in f:
                 word_pair = line.split()
                 word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
                 if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
-                    self.syn_constraints |= {(word_pair[0], word_pair[1])}
+                    self.syn_pairs |= {(word_pair[0], word_pair[1])}
 
-        self.ant_constraints = set()
+        self.ant_pairs = set()
         with open(fthesauri['ant_fname'], 'r') as f:
             for line in f:
                 word_pair = line.split()
                 word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
                 if word_pair[0] in words_set and word_pair[1] in words_set and word_pair[0] != word_pair[1]:
-                    self.ant_constraints |= {(word_pair[0], word_pair[1])}
+                    self.ant_pairs |= {(word_pair[0], word_pair[1])}
 
         # Post-processing: remove synonym pairs which are deemed to be both synonyms and antonyms:
         # this is what ar used
         # todo: try another option: remove the intersect from both constraints
-        for antonym_pair in self.ant_constraints:
-            if antonym_pair in self.syn_constraints:
-                self.syn_constraints.remove(antonym_pair)
+        for antonym_pair in self.ant_pairs:
+            if antonym_pair in self.syn_pairs:
+                self.syn_pairs.remove(antonym_pair)
 
-        self.syn_constraints = list(self.syn_constraints)
-        self.ant_constraints = list(self.ant_constraints)
-
-    def generate_syn_ant_graph(self):
-        '''
-        add words as nodes, use thesauri to add 1/-1 edges to nodes
-        :return: adj graph of the positive and negative graph
-        '''
-        G = nx.Graph()
-        G.add_nodes_from(self.words)
-
-        positive_edges = ((k, v, 1) for k, v in self.syn_constraints)
-        negative_edges = ((k, v, -1) for k, v in self.ant_constraints)
-        G.add_weighted_edges_from(positive_edges)
-        # If a pair of words has positive edge and negative edge, the positive edge will be removed
-        # then the previous post-processing step can be removed
-        # todo: try use two graphs
-        G.add_weighted_edges_from(negative_edges)
-
-        adj = nx.adjacency_matrix(G, nodelist=self.words)
-
-        adj_pos = adj.copy()
-        adj_pos[adj < 0] = 0
-        adj_pos.eliminate_zeros()
-
-        adj_neg = adj.copy()
-        adj_neg[adj > 0] = 0
-        adj_neg.eliminate_zeros()
-        return adj_pos, adj_neg
+        self.syn_pairs = list(self.syn_pairs)
+        self.ant_pairs = list(self.ant_pairs)
