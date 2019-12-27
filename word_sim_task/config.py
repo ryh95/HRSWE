@@ -7,23 +7,16 @@ from skopt.space import Real, Integer, Categorical
 from constants import AR_THES_DIR, THESAURUS_DIR
 
 # public config
-adv_thesauri = {'syn_fname': join(THESAURUS_DIR, 'clf', 'adv_synonyms.txt'),
-                'ant_fname': join(THESAURUS_DIR, 'clf', 'adv_antonyms.txt')}
-ori_thesauri = {'syn_fname': join(THESAURUS_DIR, 'clf', 'synonyms.txt'),
-                'ant_fname': join(THESAURUS_DIR, 'clf', 'antonyms.txt')}
-ths = np.linspace(-1,1,40)
+adv_thesauri = {'syn_fname': join(THESAURUS_DIR, 'sim', 'adv_synonyms.txt'),
+                'ant_fname': join(THESAURUS_DIR, 'sim', 'adv_antonyms.txt')}
+ori_thesauri = {'syn_fname': join(THESAURUS_DIR, 'sim', 'synonyms.txt'),
+                'ant_fname': join(THESAURUS_DIR, 'sim', 'antonyms.txt')}
 public_hyp_config = {
     'n_calls':60,
     'verbose':True
 }
 
 # HRSWE config
-# model_config(HRSWE config),hyp_tune_config(opt_space, bayes func),exp_config(save_emb,exp_name)
-
-# hrswe_hyp_config = {
-#     'x0':[0.8,0.8]
-# }
-# hrswe_hyp_config = {**public_hyp_config,**hrswe_hyp_config}
 
 hrswe_exp_config = {
     'save_res':True,
@@ -44,10 +37,7 @@ hrswe_config = {
 
 
 # AR config
-# ar_hyp_config = {
-#     'x0':[0.4,0.6,64,10,10**-8]
-# }
-# ar_hyp_config = {**public_hyp_config,**ar_hyp_config}
+
 ar_exp_config = {
     'save_res':True,
     'exp_name':'ar'

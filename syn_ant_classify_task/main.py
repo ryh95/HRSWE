@@ -7,9 +7,9 @@ from constants import THESAURUS_DIR
 from dataset import Dataset
 from model import AR, HRSWE
 from syn_ant_classify_task.config import ori_thesauri, adv_thesauri, ths, ar_config, hrswe_config
-from syn_ant_classify_task.experiments import BaseExperiments
+from experiments import BaseExperiments
 from utils import generate_adv3, generate_sub_thesauri
-from evaluate import Evaluator, SynAntClyEvaluator
+from evaluate import SynAntClyEvaluator
 
 
 # load datasets

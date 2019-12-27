@@ -57,7 +57,7 @@ class WordSimEvaluator(Evaluator):
             score = evaluate_similarity(emb_dict, data.X, data.y)
             print("Spearman correlation of scores on {} {}".format(name, score),file=file)
             results[name] = score
-        self.cur_score = results['SIMVERB500-dev']
+        self.cur_score = sum(results.values())
         self.cur_results = results
         self.cur_emb = emb_dict
         return self.cur_score, self.cur_results

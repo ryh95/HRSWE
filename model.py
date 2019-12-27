@@ -16,8 +16,9 @@ class HRSWE(object):
 
     def __init__(self, *hyps):
 
-        beta1, beta2 = hyps
+        beta0,beta1, beta2 = hyps
 
+        self.beta0 = beta0
         self.beta1 = beta1
         self.beta2 = beta2
 
@@ -43,7 +44,7 @@ class HRSWE(object):
 
         adj_pos,adj_neg = self.generate_syn_ant_graph(words,syn_pairs,ant_pairs)
 
-        W_prime = W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
+        W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
 
         W_hat = nearestPD(W_prime)
 
