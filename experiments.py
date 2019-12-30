@@ -53,39 +53,41 @@ class BaseExperiments(object):
 
         return score
 
-    def run_InjectedMatrix(self,*hyps):
-        # todo: refactor this function latter
-        beta1s, beta2s = hyps
+class MatrixExperiments(BaseExperiments):
 
-        words_emb = [self.dataset.emb_dict[w] for w in self.dataset.words]
-        words2id = {w:i for i,w in enumerate(self.dataset.words)}
-        words_emb = np.vstack(words_emb).T
-        # todo: normalize or not?
-        # words_emb = words_emb / linalg.norm(words_emb,axis=0)
+    def get_val_score(self, feasible_hyps):
 
-        results = defaultdict(list)
-        results['beta_range1'] = beta1s
-        results['beta_range2'] = beta2s
+        model = self.model(*feasible_hyps)
+        rf_matrix = model.specialize_emb(self.dataset.emb_dict,
+                                      self.dataset.syn_pairs,self.dataset.ant_pairs)
+        word2id = {w:i for i,w in enumerate(self.dataset.words)}
+        score,_ = self.val_evaluator.eval_injected_matrix(rf_matrix,word2id)
+        self.val_evaluator.update_results()
 
-        cur_best_score = -np.inf
-        adj_pos, adj_neg = self.dataset.generate_syn_ant_graph()
+        return -score # minimize to optimize
 
-        W = words_emb.T @ words_emb
+    def run(self):
 
-        for beta1 in beta1s:
-            for beta2 in beta2s:
+        hyp_tune_func = self.config['hyp_tune_func']
+        res = hyp_tune_func(self.get_val_score, self.config['hyp_opt_space'],
+                                 **self.config['tune_func_config'])
 
-                W_prime = W + beta1 * adj_pos.multiply(np.max(W) - W) + beta2 * adj_neg.multiply(
-                    W - np.min(W))
+        best_emb_dict = self.val_evaluator.best_emb
+        word2id = {w: i for i, w in enumerate(self.dataset.words)}
+        score, test_res = self.test_evaluator.eval_injected_matrix(best_emb_dict,word2id)
 
-                # check this matrix with validation data
-                scores = self.evaluator.eval_injected_matrix({"SIMVERB500-dev": self.dataset.sim_tasks["SIMVERB500-dev"]},
-                                                        W_prime,words2id)
+        if self.config['exp_config']['save_res']:
+            final_res = {
+                'best_matrix':best_emb_dict,
+                'test_res':test_res,
+                'best_val_res':self.val_evaluator.best_results,
+                'best_hyps':res.x,
+                'config':self.config
+            }
+            if isinstance(self.test_evaluator,SynAntClyEvaluator):
+                final_res['best_th'] = test_res['th']
 
-                if scores['SIMVERB500-dev'] > cur_best_score:
+            with open(self.config['exp_config']['exp_name']+'_results' + '.pickle', 'wb') as handle:
+                pickle.dump(final_res, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-                    results['best_matrix'] = W_prime
-                    results['best_betas'] = [beta1,beta2]
-                    cur_best_score = scores['SIMVERB500-dev']
-
-        self.evaluator.eval_injected_matrix(self.dataset.sim_tasks,results['best_matrix'],words2id)
+        return score

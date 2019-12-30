@@ -30,6 +30,10 @@ hrswe_config = {
         Real(10**-3,10**2,'log-uniform'),# beta0
         Real(10**-3,10**2,'log-uniform'),# beta1
         Real(10**-3,10**2,'log-uniform'),# beta2
+        # Real(0,1), # W_max
+        # Real(-1,0) # W_min
+        # Real(10**-3,10**2,'log-uniform'),# beta3
+        # Real(10**-3,10**2,'log-uniform'),# beta4
     ],
     'tune_func_config': public_hyp_config,
 

@@ -36,30 +36,32 @@ class Evaluator(ABC):
         pass
 
 
-    def eval_injected_matrix(self,tasks,matrix,words2id):
-        # todo: refactor this fuc later
-        scores = {}
-        print('*' * 30)
-        for name, data in iteritems(tasks):
-            pred_y = [matrix[tuple(words2id[w] for w in p)] for p in data.X]
-            score = scipy.stats.spearmanr(pred_y, data.y).correlation
-            print("Spearman correlation of scores on {} {}".format(name, score))
-            scores[name] = score
-        return scores
-
 
 class WordSimEvaluator(Evaluator):
 
     def eval_emb_on_tasks(self, emb_dict, file=sys.stdout):
         results = {}
         print('*' * 30)
-        for name, data in iteritems(self.tasks):
+        for name, data in self.tasks.items():
             score = evaluate_similarity(emb_dict, data.X, data.y)
             print("Spearman correlation of scores on {} {}".format(name, score),file=file)
             results[name] = score
         self.cur_score = sum(results.values())
         self.cur_results = results
         self.cur_emb = emb_dict
+        return self.cur_score, self.cur_results
+
+    def eval_injected_matrix(self,matrix,words2id, file=sys.stdout):
+        results = {}
+        print('*' * 30)
+        for name, data in self.tasks.items():
+            pred_y = [matrix[tuple(words2id[w] for w in p)] for p in data.X]
+            score = scipy.stats.spearmanr(pred_y, data.y).correlation
+            print("Spearman correlation of scores on {} {}".format(name, score),file=file)
+            results[name] = score
+        self.cur_score = sum(results.values())
+        self.cur_results = results
+        self.cur_emb = matrix
         return self.cur_score, self.cur_results
 
     def draw_HRSWE_dev_results(self,results_fname,sim_tasks):

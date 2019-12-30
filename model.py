@@ -17,10 +17,13 @@ class HRSWE(object):
     def __init__(self, *hyps):
 
         beta0,beta1, beta2 = hyps
+        # beta0,beta1, beta2,beta3,beta4 = hyps
 
         self.beta0 = beta0
         self.beta1 = beta1
         self.beta2 = beta2
+        # self.beta3 = beta3
+        # self.beta4 = beta4
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
         """
@@ -39,12 +42,20 @@ class HRSWE(object):
         emb = [vec for vec in emb_dict.values()]
         emb = np.vstack(emb).astype(np.float32).T
 
+        # todo: configuration: normalize vector
+        # emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        # emb = emb / emb_norm
+        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+
         d, n = emb.shape
         W = emb.T @ emb
 
         adj_pos,adj_neg = self.generate_syn_ant_graph(words,syn_pairs,ant_pairs)
 
         W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
+        # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - self.beta3*W) + self.beta2 * adj_neg.multiply(W - self.beta4*np.min(W))
+        # W_prime = self.beta0 * W - self.beta1 * adj_pos.multiply(W) - self.beta2 * adj_neg.multiply(W) + \
+        #           self.beta1 * adj_pos.multiply(np.max(W)) + self.beta2 * adj_neg.multiply(np.min(W))
 
         W_hat = nearestPD(W_prime)
 
@@ -83,6 +94,41 @@ class HRSWE(object):
         adj_neg[adj > 0] = 0
         adj_neg.eliminate_zeros()
         return adj_pos,adj_neg
+
+class RetrofittedMatrix(HRSWE):
+
+    def __init__(self, *hyps):
+        beta0, beta1, beta2 = hyps
+        super().__init__(beta0,beta1,beta2)
+
+        # beta0,beta1, beta2,beta3,beta4 = hyps
+        # self.W_max = W_max
+        # self.W_min = W_min
+
+        # self.beta3 = beta3
+        # self.beta4 = beta4
+
+    def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
+
+        words = [w for w in emb_dict.keys()]
+        emb = [vec for vec in emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32).T
+
+        # normalize vector
+        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        emb = emb / emb_norm
+        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+
+        W = emb.T @ emb
+
+        adj_pos, adj_neg = self.generate_syn_ant_graph(words, syn_pairs, ant_pairs)
+
+        W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(
+            W - np.min(W))
+
+        W_prime = np.clip(W_prime,-1,1)
+
+        return W_prime
 
 class LHRSWE(object):
     # todo: finish this if used
