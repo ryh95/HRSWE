@@ -1,3 +1,4 @@
+import pickle
 from os.path import join
 
 import numpy as np
@@ -34,6 +35,10 @@ ar_test = WordSimEvaluator(test_tasks)
 
 # experiments
 hrswe_exp = MatrixExperiments(RetrofittedMatrix,hrswe_val,hrswe_test,dataset,hrswe_config)
+
+# with open('hrswe_results.pickle','rb') as f:
+#     results_hrswe = pickle.load(f)
+# hrswe_exp.get_val_score(results_hrswe['best_hyps'])
 
 # run exps
 hrswe_test_score = hrswe_exp.run()

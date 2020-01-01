@@ -16,14 +16,14 @@ class HRSWE(object):
 
     def __init__(self, *hyps):
 
-        beta0,beta1, beta2 = hyps
-        # beta0,beta1, beta2,beta3,beta4 = hyps
+        # beta0,beta1, beta2 = hyps
+        beta0,beta1, beta2,beta3,beta4 = hyps
 
         self.beta0 = beta0
         self.beta1 = beta1
         self.beta2 = beta2
-        # self.beta3 = beta3
-        # self.beta4 = beta4
+        self.beta3 = beta3
+        self.beta4 = beta4
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
         """
@@ -52,10 +52,13 @@ class HRSWE(object):
 
         adj_pos,adj_neg = self.generate_syn_ant_graph(words,syn_pairs,ant_pairs)
 
-        W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(W - np.min(W))
+        # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(self.beta3 - W) - self.beta2 * adj_neg.multiply(W - self.beta4)
+        # W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
+        #     W - (-1))
+        # W_prime = np.clip(W_prime, -1, 1)
         # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - self.beta3*W) + self.beta2 * adj_neg.multiply(W - self.beta4*np.min(W))
-        # W_prime = self.beta0 * W - self.beta1 * adj_pos.multiply(W) - self.beta2 * adj_neg.multiply(W) + \
-        #           self.beta1 * adj_pos.multiply(np.max(W)) + self.beta2 * adj_neg.multiply(np.min(W))
+        W_prime = self.beta0 * W - self.beta1 * adj_pos.multiply(W) - self.beta2 * adj_neg.multiply(W) + \
+                  self.beta3 * adj_pos.multiply(np.max(W)) + self.beta4 * adj_neg.multiply(np.min(W))
 
         W_hat = nearestPD(W_prime)
 
@@ -68,7 +71,7 @@ class HRSWE(object):
 
         return new_emb
 
-    def generate_syn_ant_graph(self,words,syn_pairs,ant_pairs):
+    def generate_syn_ant_graph(self, words, syn_pairs, ant_pairs):
         '''
         add words as nodes, use thesauri to add 1/-1 edges to nodes
         :return: adj graph of the positive and negative graph
@@ -92,6 +95,7 @@ class HRSWE(object):
 
         adj_neg = adj.copy()
         adj_neg[adj > 0] = 0
+        adj_neg[adj < 0] = 1
         adj_neg.eliminate_zeros()
         return adj_pos,adj_neg
 
@@ -123,16 +127,63 @@ class RetrofittedMatrix(HRSWE):
 
         adj_pos, adj_neg = self.generate_syn_ant_graph(words, syn_pairs, ant_pairs)
 
-        W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(np.max(W) - W) + self.beta2 * adj_neg.multiply(
-            W - np.min(W))
+        W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
+            W - (-1))
 
         W_prime = np.clip(W_prime,-1,1)
 
         return W_prime
 
-class LHRSWE(object):
-    # todo: finish this if used
-    pass
+    def generate_syn_ant_graph(self, words, syn_pairs, ant_pairs):
+        '''
+        add words as nodes, use thesauri to add 1/-1 edges to nodes
+        :return: adj graph of the positive and negative graph
+        '''
+        G_syn = nx.Graph()
+        G_syn.add_nodes_from(words)
+        positive_edges = ((k, v, 1) for k, v in syn_pairs)
+        G_syn.add_weighted_edges_from(positive_edges)
+        # If a pair of words has positive edge and negative edge, the positive edge will be removed
+        # then the previous post-processing step can be removed
+        G_ant = nx.Graph()
+        G_ant.add_nodes_from(words)
+        negative_edges = ((k, v, 1) for k, v in ant_pairs)
+        G_ant.add_weighted_edges_from(negative_edges)
+
+        adj_pos = nx.adjacency_matrix(G_syn, nodelist=words)
+        adj_neg = nx.adjacency_matrix(G_ant, nodelist=words)
+
+        return adj_pos, adj_neg
+
+class LHRSWE(HRSWE):
+
+    def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
+
+        words = [w for w in emb_dict.keys()]
+        emb = [vec for vec in emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32).T
+
+        d,n = emb.shape
+
+        # normalize vector
+        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        emb = emb / emb_norm
+        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+
+        W = emb.T @ emb
+
+        adj_pos, adj_neg = self.generate_syn_ant_graph(words, syn_pairs, ant_pairs)
+
+        W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
+            W - (-1))
+
+        W_prime = np.clip(W_prime,-1,1)
+
+        lamb_s, Q_s = linalg.eigh(W_prime, eigvals=(n - d, n - 1))
+        # todo: normalize Q_s if needed
+        # row_norm = np.linalg.norm(Q_s, axis=1)[:, np.newaxis]
+        # Q_s = Q_s / row_norm
+        return Q_s
 
 class AR(object):
 
