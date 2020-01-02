@@ -1,0 +1,75 @@
+config:
+matrix query model
+no spread
+two hyps model
+W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
+            W - (-1))
+W normalized
+W_prime clipped
+Categorical([1]),# beta0
+Real(0,1),# beta1
+Real(0,1),# beta2
+Categorical([1]), # mis_syn
+
+results:
+Current minimum: -0.6646
+******************************
+Spearman correlation of scores on SIMLEX999 0.7438524932660341
+Spearman correlation of scores on SIMVERB3000-test 0.6746190514449852
+
+
+config:
+matrix query model
+spread
+three hyps model
+W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
+            W - (-1)) + self.mis_syn * self.adj_spread
+W normalized
+W_prime clipped
+Categorical([1]),# beta0
+Real(0,1),# beta1
+Real(0,1),# beta2
+Real(0, 1), # mis_syn
+
+results:
+Current minimum: -0.6928
+******************************
+Spearman correlation of scores on SIMLEX999 0.7563893673461434
+Spearman correlation of scores on SIMVERB3000-test 0.7061103499163739
+
+config:
+HRSWE model
+no spread
+two hyps model
+W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
+W normalized
+W_prime clipped
+Categorical([1]),# beta0
+Real(0,1),# beta1
+Real(0,1),# beta2
+
+results:
+Current minimum: -0.7184
+******************************
+Spearman correlation of scores on SIMLEX999 0.6852763876463803
+Spearman correlation of scores on SIMVERB3000-test 0.6976228553393782
+
+
+config:
+HRSWE model
+spread
+three hyps model
+W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+W normalized
+W_prime clipped
+Categorical([1]),# beta0
+Real(0,1),# beta1
+Real(0,1),# beta2
+Real(0,1) # mis_syn
+
+
+results:
+Current minimum: -0.7409
+******************************
+Spearman correlation of scores on SIMLEX999 0.7101933236389073
+Spearman correlation of scores on SIMVERB3000-test 0.7249105571650203

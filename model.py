@@ -65,6 +65,37 @@ separate syn ant graph version of generate_syn_ant_graph
 #
 #     return adj_pos, adj_neg
 
+def generate_speard_graph_1(G_thes):
+
+    # only consider the three nodes types
+    G_spread = nx.Graph()
+    G_spread.nodes()
+    G_spread.add_nodes_from(G_thes.nodes)
+    i_k_syn_counter = Counter()
+    i_k_ant_counter = Counter()
+
+    for w_i in G_thes.nodes:
+        for w_j in G_thes[w_i]:
+            req_w_k = (w_k for w_k in G_thes[w_j] if w_k not in G_thes[w_i] and w_k not in (w_i, w_j))
+            for w_k in req_w_k:
+
+                if G_thes[w_i][w_j]['weight'] * G_thes[w_j][w_k]['weight'] > 0:
+
+                    G_spread.add_edge(w_i, w_k, weight=1) # add an edge
+
+                    i_k_syn_counter.update([frozenset((w_i, w_k))])
+
+                else:
+
+                    if w_k in G_spread[w_i]:
+                        # if i,k is linked in spread graph
+                        # remove this link
+                        G_spread.remove_edge(w_i,w_k)
+
+                    i_k_ant_counter.update([frozenset((w_i, w_k))])
+
+    return G_spread
+
 def generate_spread_graph(G_thes,mis_syn,mis_ant):
 
     # only consider the three nodes types
@@ -101,12 +132,10 @@ class HRSWE(object):
 
     def __init__(self, *hyps, **kwargs):
 
-        beta0,beta1, beta2 = hyps
+        self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+        # self.beta0, self.beta1, self.beta2 = hyps
         # beta0,beta1, beta2,beta3,beta4 = hyps
 
-        self.beta0 = beta0
-        self.beta1 = beta1
-        self.beta2 = beta2
         # self.beta3 = beta3
         # self.beta4 = beta4
 
@@ -127,7 +156,6 @@ class HRSWE(object):
 
         :return: nxd ndarray new word embedding
         """
-        words = [w for w in emb_dict.keys()]
         emb = [vec for vec in emb_dict.values()]
         emb = np.vstack(emb).astype(np.float32).T
 
@@ -139,12 +167,13 @@ class HRSWE(object):
         d, n = emb.shape
         W = emb.T @ emb
 
-        # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(self.beta3 - W) - self.beta2 * adj_neg.multiply(W - self.beta4)
+        # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
+        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
         # W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
         #     W - (-1))
         # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - self.beta3*W) + self.beta2 * adj_neg.multiply(W - self.beta4*np.min(W))
-        W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
-                  self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
+        # W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
+        #           self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
 
         W_prime = np.clip(W_prime, -1, 1)
 
@@ -161,17 +190,15 @@ class HRSWE(object):
 
 class RetrofittedMatrix(object):
 
-    def __init__(self, *hyps):
-        beta0, beta1, beta2, mis_syn, mis_ant = hyps
-        self.beta0 = beta0
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.mis_syn = mis_syn
-        self.mis_ant = mis_ant
+    def __init__(self, *hyps,**kwargs):
+        self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+
+        self.adj_pos = kwargs['adj_pos']
+        self.adj_neg = kwargs['adj_neg']
+        self.adj_spread = kwargs['adj_spread']
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
 
-        words = [w for w in emb_dict.keys()]
         emb = [vec for vec in emb_dict.values()]
         emb = np.vstack(emb).astype(np.float32).T
 
@@ -182,12 +209,10 @@ class RetrofittedMatrix(object):
 
         W = emb.T @ emb
 
-        adj_pos, adj_neg,g = generate_syn_ant_graph(words, syn_pairs, ant_pairs)
-
-        g_spread = generate_spread_graph(g,self.mis_syn,self.mis_ant)
-
-        W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
-            W - (-1))
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
+        #     W - (-1))
+        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
+            W - (-1)) + self.mis_syn * self.adj_spread
 
         W_prime = np.clip(W_prime,-1,1)
 

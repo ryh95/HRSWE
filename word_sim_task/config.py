@@ -32,6 +32,7 @@ hrswe_config = {
         # Real(10**-3,10**2,'log-uniform'),
         Real(0,1),# beta1
         Real(0,1),# beta2
+        Real(0,1) # mis_syn
         # Real(0,1), # W_max
         # Real(-1,0) # W_min
         # Real(10**-3,10**2,'log-uniform'),# beta3
@@ -68,7 +69,7 @@ lhrswe_config = {
 # Retrofitted matrix
 matrix_exp_config = {
     'save_res':True,
-    'exp_name':'lhrswe'
+    'exp_name':'rf_matrix'
 }
 
 matrix_config = {
@@ -78,8 +79,9 @@ matrix_config = {
         Categorical([1]),# beta0
         Real(0,1),# beta1
         Real(0,1),# beta2
-        Categorical([0.4]),
-        Categorical([0.6])
+        Real(0, 1), # mis_syn
+        # Categorical([0.4]),
+        # Categorical([0.6])
         # Real(10**-3,10**2,'log-uniform'),# beta3
         # Real(10**-3,10**2,'log-uniform'),# beta4
     ],

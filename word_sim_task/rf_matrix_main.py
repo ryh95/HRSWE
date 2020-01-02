@@ -5,7 +5,7 @@ import numpy as np
 from constants import THESAURUS_DIR
 from dataset import Dataset
 from model import AR, HRSWE, RetrofittedMatrix
-from word_sim_task.config import ori_thesauri, ar_config, hrswe_config
+from word_sim_task.config import ori_thesauri, ar_config, hrswe_config, matrix_config
 from experiments import BaseExperiments, MatrixExperiments
 from utils import generate_sub_thesauri
 from evaluate import WordSimEvaluator
@@ -34,7 +34,7 @@ ar_val = WordSimEvaluator(val_tasks)
 ar_test = WordSimEvaluator(test_tasks)
 
 # experiments
-hrswe_exp = MatrixExperiments(RetrofittedMatrix,hrswe_val,hrswe_test,dataset,hrswe_config)
+hrswe_exp = MatrixExperiments(RetrofittedMatrix,hrswe_val,hrswe_test,dataset,matrix_config)
 
 # with open('hrswe_results.pickle','rb') as f:
 #     results_hrswe = pickle.load(f)
@@ -42,5 +42,3 @@ hrswe_exp = MatrixExperiments(RetrofittedMatrix,hrswe_val,hrswe_test,dataset,hrs
 
 # run exps
 hrswe_test_score = hrswe_exp.run()
-hrswe_test_fscore = hrswe_exp.config['exp_config']['exp_name'] + '_score' + '.npy'
-np.save(hrswe_test_fscore, hrswe_test_score)
