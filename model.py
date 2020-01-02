@@ -1,5 +1,6 @@
 import random
 import time
+from collections import Counter
 
 import networkx as nx
 import numpy as np
@@ -12,18 +13,106 @@ from scipy.spatial.distance import squareform
 from utils import nearestPD
 import tensorflow as tf
 
+
+def generate_syn_ant_graph(words, syn_pairs, ant_pairs):
+    '''
+    add words as nodes, use thesauri to add 1/-1 edges to nodes
+    :return: adj graph of the positive and negative graph
+    '''
+    G = nx.Graph()
+    G.add_nodes_from(words)
+
+    positive_edges = ((k, v, 1) for k, v in syn_pairs)
+    negative_edges = ((k, v, -1) for k, v in ant_pairs)
+    G.add_weighted_edges_from(positive_edges)
+    # If a pair of words has positive edge and negative edge, the positive edge will be removed
+    # then the previous post-processing step can be removed
+    G.add_weighted_edges_from(negative_edges)
+
+    adj = nx.adjacency_matrix(G, nodelist=words)
+
+    adj_pos = adj.copy()
+    adj_pos[adj < 0] = 0
+    adj_pos.eliminate_zeros()
+
+    adj_neg = adj.copy()
+    adj_neg[adj > 0] = 0
+    adj_neg[adj < 0] = 1
+    adj_neg.eliminate_zeros()
+    return adj_pos, adj_neg, G
+
+'''
+separate syn ant graph version of generate_syn_ant_graph
+'''
+# def generate_syn_ant_graph(self, words, syn_pairs, ant_pairs):
+#     '''
+#     add words as nodes, use thesauri to add 1/-1 edges to nodes
+#     :return: adj graph of the positive and negative graph
+#     '''
+#     G_syn = nx.Graph()
+#     G_syn.add_nodes_from(words)
+#     positive_edges = ((k, v, 1) for k, v in syn_pairs)
+#     G_syn.add_weighted_edges_from(positive_edges)
+#     # If a pair of words has positive edge and negative edge, the positive edge will be removed
+#     # then the previous post-processing step can be removed
+#     G_ant = nx.Graph()
+#     G_ant.add_nodes_from(words)
+#     negative_edges = ((k, v, 1) for k, v in ant_pairs)
+#     G_ant.add_weighted_edges_from(negative_edges)
+#
+#     adj_pos = nx.adjacency_matrix(G_syn, nodelist=words)
+#     adj_neg = nx.adjacency_matrix(G_ant, nodelist=words)
+#
+#     return adj_pos, adj_neg
+
+def generate_spread_graph(G_thes,mis_syn,mis_ant):
+
+    # only consider the three nodes types
+    G_spread = nx.Graph()
+    G_spread.add_nodes_from(G_thes.nodes)
+    i_k_syn_counter = Counter()
+    i_k_ant_counter = Counter()
+
+    for w_i in G_thes.nodes:
+        for w_j in G_thes[w_i]:
+            req_w_k = (w_k for w_k in G_thes[w_j] if w_k not in G_thes[w_i] and w_k not in (w_i, w_j))
+            for w_k in req_w_k:
+
+                if G_thes[w_i][w_j]['weight'] * G_thes[w_j][w_k]['weight'] > 0:
+
+                    if w_k not in G_spread[w_i]:
+                        G_spread.add_edge(w_i,w_k,weight=mis_syn)
+                    else:
+                        G_spread[w_i][w_k]['weight'] += mis_syn ** (i_k_syn_counter[frozenset((w_i,w_k))]+1)
+                    i_k_syn_counter.update([frozenset((w_i,w_k))])
+
+                else:
+
+                    if w_k not in G_spread[w_i]:
+                        G_spread.add_edge(w_i, w_k, weight=-mis_ant)
+                    else:
+                        G_spread[w_i][w_k]['weight'] -= mis_ant ** (i_k_ant_counter[frozenset((w_i,w_k))]+1)
+                    i_k_ant_counter.update([frozenset((w_i, w_k))])
+
+
+    return G_spread
+
 class HRSWE(object):
 
-    def __init__(self, *hyps):
+    def __init__(self, *hyps, **kwargs):
 
-        # beta0,beta1, beta2 = hyps
-        beta0,beta1, beta2,beta3,beta4 = hyps
+        beta0,beta1, beta2 = hyps
+        # beta0,beta1, beta2,beta3,beta4 = hyps
 
         self.beta0 = beta0
         self.beta1 = beta1
         self.beta2 = beta2
-        self.beta3 = beta3
-        self.beta4 = beta4
+        # self.beta3 = beta3
+        # self.beta4 = beta4
+
+        self.adj_pos = kwargs['adj_pos']
+        self.adj_neg = kwargs['adj_neg']
+        self.adj_spread = kwargs['adj_spread']
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
         """
@@ -43,22 +132,21 @@ class HRSWE(object):
         emb = np.vstack(emb).astype(np.float32).T
 
         # todo: configuration: normalize vector
-        # emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
-        # emb = emb / emb_norm
+        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        emb = emb / emb_norm
         # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
 
         d, n = emb.shape
         W = emb.T @ emb
 
-        adj_pos,adj_neg = self.generate_syn_ant_graph(words,syn_pairs,ant_pairs)
-
         # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(self.beta3 - W) - self.beta2 * adj_neg.multiply(W - self.beta4)
         # W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
         #     W - (-1))
-        # W_prime = np.clip(W_prime, -1, 1)
         # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - self.beta3*W) + self.beta2 * adj_neg.multiply(W - self.beta4*np.min(W))
-        W_prime = self.beta0 * W - self.beta1 * adj_pos.multiply(W) - self.beta2 * adj_neg.multiply(W) + \
-                  self.beta3 * adj_pos.multiply(np.max(W)) + self.beta4 * adj_neg.multiply(np.min(W))
+        W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
+                  self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
+
+        W_prime = np.clip(W_prime, -1, 1)
 
         W_hat = nearestPD(W_prime)
 
@@ -71,46 +159,15 @@ class HRSWE(object):
 
         return new_emb
 
-    def generate_syn_ant_graph(self, words, syn_pairs, ant_pairs):
-        '''
-        add words as nodes, use thesauri to add 1/-1 edges to nodes
-        :return: adj graph of the positive and negative graph
-        '''
-        G = nx.Graph()
-        G.add_nodes_from(words)
-
-        positive_edges = ((k, v, 1) for k, v in syn_pairs)
-        negative_edges = ((k, v, -1) for k, v in ant_pairs)
-        G.add_weighted_edges_from(positive_edges)
-        # If a pair of words has positive edge and negative edge, the positive edge will be removed
-        # then the previous post-processing step can be removed
-        # todo: try use two graphs
-        G.add_weighted_edges_from(negative_edges)
-
-        adj = nx.adjacency_matrix(G, nodelist=words)
-
-        adj_pos = adj.copy()
-        adj_pos[adj < 0] = 0
-        adj_pos.eliminate_zeros()
-
-        adj_neg = adj.copy()
-        adj_neg[adj > 0] = 0
-        adj_neg[adj < 0] = 1
-        adj_neg.eliminate_zeros()
-        return adj_pos,adj_neg
-
-class RetrofittedMatrix(HRSWE):
+class RetrofittedMatrix(object):
 
     def __init__(self, *hyps):
-        beta0, beta1, beta2 = hyps
-        super().__init__(beta0,beta1,beta2)
-
-        # beta0,beta1, beta2,beta3,beta4 = hyps
-        # self.W_max = W_max
-        # self.W_min = W_min
-
-        # self.beta3 = beta3
-        # self.beta4 = beta4
+        beta0, beta1, beta2, mis_syn, mis_ant = hyps
+        self.beta0 = beta0
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.mis_syn = mis_syn
+        self.mis_ant = mis_ant
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
 
@@ -125,7 +182,9 @@ class RetrofittedMatrix(HRSWE):
 
         W = emb.T @ emb
 
-        adj_pos, adj_neg = self.generate_syn_ant_graph(words, syn_pairs, ant_pairs)
+        adj_pos, adj_neg,g = generate_syn_ant_graph(words, syn_pairs, ant_pairs)
+
+        g_spread = generate_spread_graph(g,self.mis_syn,self.mis_ant)
 
         W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
             W - (-1))
@@ -133,27 +192,6 @@ class RetrofittedMatrix(HRSWE):
         W_prime = np.clip(W_prime,-1,1)
 
         return W_prime
-
-    def generate_syn_ant_graph(self, words, syn_pairs, ant_pairs):
-        '''
-        add words as nodes, use thesauri to add 1/-1 edges to nodes
-        :return: adj graph of the positive and negative graph
-        '''
-        G_syn = nx.Graph()
-        G_syn.add_nodes_from(words)
-        positive_edges = ((k, v, 1) for k, v in syn_pairs)
-        G_syn.add_weighted_edges_from(positive_edges)
-        # If a pair of words has positive edge and negative edge, the positive edge will be removed
-        # then the previous post-processing step can be removed
-        G_ant = nx.Graph()
-        G_ant.add_nodes_from(words)
-        negative_edges = ((k, v, 1) for k, v in ant_pairs)
-        G_ant.add_weighted_edges_from(negative_edges)
-
-        adj_pos = nx.adjacency_matrix(G_syn, nodelist=words)
-        adj_neg = nx.adjacency_matrix(G_ant, nodelist=words)
-
-        return adj_pos, adj_neg
 
 class LHRSWE(HRSWE):
 

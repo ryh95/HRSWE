@@ -27,9 +27,11 @@ hrswe_config = {
     'exp_config':hrswe_exp_config,
     'hyp_tune_func':gp_minimize,
     'hyp_opt_space':[
-        Real(10**-3,10**2,'log-uniform'),# beta0
-        Real(10**-3,10**2,'log-uniform'),# beta1
-        Real(10**-3,10**2,'log-uniform'),# beta2
+        Categorical([1]),# beta0
+        # Real(10**-3,10**2,'log-uniform'),
+        # Real(10**-3,10**2,'log-uniform'),
+        Real(0,1),# beta1
+        Real(0,1),# beta2
         # Real(0,1), # W_max
         # Real(-1,0) # W_min
         # Real(10**-3,10**2,'log-uniform'),# beta3
@@ -39,6 +41,51 @@ hrswe_config = {
 
 }
 
+
+# LHRSWE
+lhrswe_exp_config = {
+    'save_res':True,
+    'exp_name':'lhrswe'
+}
+
+lhrswe_config = {
+    'exp_config':lhrswe_exp_config,
+    'hyp_tune_func':gp_minimize,
+    'hyp_opt_space':[
+        Categorical([1]),# beta0
+        Real(0,1),# beta1
+        Real(0,1),# beta2
+        # Real(0,1), # W_max
+        # Real(-1,0) # W_min
+        # Real(10**-3,10**2,'log-uniform'),# beta3
+        # Real(10**-3,10**2,'log-uniform'),# beta4
+    ],
+    'tune_func_config': public_hyp_config,
+
+}
+
+
+# Retrofitted matrix
+matrix_exp_config = {
+    'save_res':True,
+    'exp_name':'lhrswe'
+}
+
+matrix_config = {
+    'exp_config':matrix_exp_config,
+    'hyp_tune_func':gp_minimize,
+    'hyp_opt_space':[
+        Categorical([1]),# beta0
+        Real(0,1),# beta1
+        Real(0,1),# beta2
+        Categorical([0.4]),
+        Categorical([0.6])
+        # Real(10**-3,10**2,'log-uniform'),# beta3
+        # Real(10**-3,10**2,'log-uniform'),# beta4
+    ],
+    'tune_func_config': public_hyp_config,
+
+}
 
 # AR config
 
