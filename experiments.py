@@ -6,7 +6,8 @@ import networkx as nx
 import numpy as np
 
 from evaluate import SynAntClyEvaluator
-from model import generate_syn_ant_graph, generate_spread_graph, generate_speard_graph_1
+from model import generate_syn_ant_graph, generate_spread_graph, generate_spread_graph_1, generate_spread_graph_2, \
+    generate_spread_graph_3
 
 
 class BaseExperiments(object):
@@ -78,7 +79,7 @@ class HRSWEExperiments(BaseExperiments):
         #     'adj_neg':adj_neg,
         #     'adj_spread':adj_spread
         # }
-        G_spread = generate_speard_graph_1(G)
+        G_spread = generate_spread_graph_1(G)
         adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
         self.model_kws = {
             'adj_pos': adj_pos,
@@ -99,7 +100,7 @@ class MatrixExperiments(BaseExperiments):
         super().__init__(model,val_evaluator,test_evaluator,dataset,config)
 
         adj_pos,adj_neg,G = generate_syn_ant_graph(dataset.words,dataset.syn_pairs,dataset.ant_pairs)
-        G_spread = generate_speard_graph_1(G)
+        G_spread = generate_spread_graph_3(G)
         adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
         self.model_kws = {
             'adj_pos':adj_pos,

@@ -1,3 +1,4 @@
+import itertools
 import random
 import time
 from collections import Counter
@@ -65,7 +66,7 @@ separate syn ant graph version of generate_syn_ant_graph
 #
 #     return adj_pos, adj_neg
 
-def generate_speard_graph_1(G_thes):
+def generate_spread_graph_1(G_thes):
 
     # only consider the three nodes types
     G_spread = nx.Graph()
@@ -93,6 +94,54 @@ def generate_speard_graph_1(G_thes):
                         G_spread.remove_edge(w_i,w_k)
 
                     i_k_ant_counter.update([frozenset((w_i, w_k))])
+
+    return G_spread
+
+def generate_spread_graph_2(G_thes):
+
+    # only consider the three nodes types
+    G_spread = nx.Graph()
+    G_spread.add_nodes_from(G_thes.nodes)
+    i_k_syn_counter = Counter()
+    i_k_ant_counter = Counter()
+
+    for w_i in G_thes.nodes:
+        for w_j in G_thes[w_i]:
+            req_w_k = (w_k for w_k in G_thes[w_j] if w_k not in G_thes[w_i] and w_k not in (w_i, w_j))
+            for w_k in req_w_k:
+
+                if G_thes[w_i][w_j]['weight'] == 1 and G_thes[w_j][w_k]['weight'] == 1:
+
+                    G_spread.add_edge(w_i, w_k, weight=1)  # add an edge
+
+                    i_k_syn_counter.update([frozenset((w_i, w_k))])
+
+                elif G_thes[w_i][w_j]['weight'] * G_thes[w_j][w_k]['weight'] < 0:
+
+                    if w_k in G_spread[w_i]:
+                        # if i,k is linked in spread graph
+                        # remove this link
+                        G_spread.remove_edge(w_i, w_k)
+
+                    i_k_ant_counter.update([frozenset((w_i, w_k))])
+
+    return G_spread
+
+def generate_spread_graph_3(G_thes):
+
+    G_spread = nx.Graph()
+    G_spread.add_nodes_from(G_thes.nodes)
+
+    for w in G_thes.nodes:
+        # fully connect a node's neighbor
+        # ref: https://stackoverflow.com/a/10651524/6609622
+        G_spread.add_edges_from(itertools.combinations(G_thes[w], 2))
+
+    for e in G_spread.edges:
+        # if the added edge is a negative edge
+        # withdraw the adding
+        if G_thes.get_edge_data(*e,default={}).get('weight') == -1:
+            G_spread.remove_edge(*e)
 
     return G_spread
 
@@ -159,23 +208,26 @@ class HRSWE(object):
         emb = [vec for vec in emb_dict.values()]
         emb = np.vstack(emb).astype(np.float32).T
 
-        # todo: configuration: normalize vector
-        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
-        emb = emb / emb_norm
+        # configuration: normalize vector
+        # emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        # emb = emb / emb_norm
         # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
 
         d, n = emb.shape
         W = emb.T @ emb
 
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
-        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+        # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
+                  self.mis_syn * self.adj_spread.multiply(W)
+
         # W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
         #     W - (-1))
         # W_prime = self.beta0*W + self.beta1 * adj_pos.multiply(np.max(W) - self.beta3*W) + self.beta2 * adj_neg.multiply(W - self.beta4*np.min(W))
         # W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
         #           self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
 
-        W_prime = np.clip(W_prime, -1, 1)
+        # W_prime = np.clip(W_prime, -1, 1)
 
         W_hat = nearestPD(W_prime)
 
@@ -213,6 +265,10 @@ class RetrofittedMatrix(object):
         #     W - (-1))
         W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
             W - (-1)) + self.mis_syn * self.adj_spread
+
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(
+        #     np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
+        #           self.mis_syn * self.adj_spread.multiply(W)
 
         W_prime = np.clip(W_prime,-1,1)
 
