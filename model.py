@@ -10,6 +10,8 @@ import numpy as np
 from scipy import linalg
 from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils.extmath import randomized_svd
 
 from utils import nearestPD
 import tensorflow as tf
@@ -145,6 +147,20 @@ def generate_spread_graph_3(G_thes):
 
     return G_spread
 
+def generate_spread_graph_4(G_thes,words):
+
+    adj = nx.adjacency_matrix(G_thes, nodelist=words)
+    for i in range(1):
+        adj = adj @ adj
+        adj = np.tanh(adj)
+        # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
+
+    G_spread = nx.from_numpy_array(adj.toarray())
+    id2words = {id:word for id,word in enumerate(words)}
+    G_spread = nx.relabel_nodes(G_spread,id2words)
+
+    return G_spread
+
 def generate_spread_graph(G_thes,mis_syn,mis_ant):
 
     # only consider the three nodes types
@@ -209,17 +225,17 @@ class HRSWE(object):
         emb = np.vstack(emb).astype(np.float32).T
 
         # configuration: normalize vector
-        # emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
-        # emb = emb / emb_norm
+        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
+        emb = emb / emb_norm
         # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
 
         d, n = emb.shape
         W = emb.T @ emb
 
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
-        # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
-        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
-                  self.mis_syn * self.adj_spread.multiply(W)
+        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+        # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
+        #           self.mis_syn * self.adj_spread.multiply(W)
 
         # W_prime = self.beta0 * W + self.beta1 * adj_pos.multiply(1 - W) - self.beta2 * adj_neg.multiply(
         #     W - (-1))
@@ -227,7 +243,10 @@ class HRSWE(object):
         # W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
         #           self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
 
-        # W_prime = np.clip(W_prime, -1, 1)
+        W_prime = np.clip(W_prime, -1, 1)
+
+        scaler = StandardScaler()
+        W_prime = scaler.fit_transform(W_prime)
 
         W_hat = nearestPD(W_prime)
 
@@ -237,6 +256,17 @@ class HRSWE(object):
         lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
 
         new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
+
+        # U, Sigma, VT = randomized_svd(W_prime,n_components=d,n_iter=100) # svd method 1
+
+        # U, Sigma, VT = np.linalg.svd(W_prime, full_matrices=False, hermitian=True) # svd method 2
+        # U = U[:,:d]
+        # Sigma = Sigma[:d]
+        # VT = VT[:d,:]
+
+        # new_emb = (np.diag(Sigma) @ VT).T
+        # new_emb = U @ np.diag(Sigma)
+        print(new_emb.shape)
 
         return new_emb
 
@@ -271,6 +301,9 @@ class RetrofittedMatrix(object):
         #           self.mis_syn * self.adj_spread.multiply(W)
 
         W_prime = np.clip(W_prime,-1,1)
+
+        # scaler = StandardScaler()
+        # W_prime = scaler.fit_transform(W_prime)
 
         return W_prime
 
