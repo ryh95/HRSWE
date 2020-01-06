@@ -12,6 +12,7 @@ from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.extmath import randomized_svd
+from tqdm import tqdm
 
 from utils import nearestPD
 import tensorflow as tf
@@ -137,9 +138,11 @@ def generate_spread_graph_3(G_thes):
     for w in G_thes.nodes:
         # fully connect a node's neighbor
         # ref: https://stackoverflow.com/a/10651524/6609622
+        # todo: fix this later, since not all neighbor edges are syn
         G_spread.add_edges_from(itertools.combinations(G_thes[w], 2))
 
     for e in G_spread.edges:
+        # todo: solve dict change issue
         # if the added edge is a negative edge
         # withdraw the adding
         if G_thes.get_edge_data(*e,default={}).get('weight') == -1:
@@ -158,6 +161,65 @@ def generate_spread_graph_4(G_thes,words):
     G_spread = nx.from_numpy_array(adj.toarray())
     id2words = {id:word for id,word in enumerate(words)}
     G_spread = nx.relabel_nodes(G_spread,id2words)
+
+    return G_spread
+
+def generate_spread_graph_5(G_thes):
+
+    '''
+    a random walk based generation
+    :param G_thes:
+    :return:
+    '''
+
+    G_spread = nx.Graph()
+    G_spread.add_nodes_from(G_thes.nodes)
+
+    nodes = G_thes.nodes
+    sel_nodes = random.sample(nodes,int(len(nodes)*0.8))
+
+    for cur_node in tqdm(sel_nodes):
+        # skip the no neighbor nodes
+        if not list(G_thes.neighbors(cur_node)): continue
+
+        # some hepler structure
+        passed_nodes = set()
+        syn_set = set()
+        ant_set = set()
+        # start from a random node
+        passed_nodes.add(cur_node)
+        for _ in range(5): # random walk 10 steps from the init node
+            # if the current node has no neighbor, break the loop
+            avail_nodes = set(G_thes.neighbors(cur_node)) - passed_nodes
+            if not avail_nodes: break
+
+            # random choose a neighbor from the node
+            next_node = random.choice(list(avail_nodes))
+            passed_nodes.add(next_node)
+
+            if cur_node not in ant_set:
+                if G_thes[cur_node][next_node]['weight'] == 1:
+                    syn_set.add(next_node)
+                else:
+                    ant_set.add(next_node)
+            else:
+                if G_thes[cur_node][next_node]['weight'] == 1:
+                    ant_set.add(next_node)
+                else:
+                    syn_set.add(next_node)
+
+            cur_node = next_node
+
+        # add edges within syn and ant and between syn and ant
+        G_spread.add_edges_from(itertools.combinations(syn_set, 2),weight=1)
+        G_spread.add_edges_from(itertools.combinations(ant_set, 2),weight=1)
+        G_spread.add_edges_from(itertools.product(syn_set,ant_set),weight=-1)
+
+        # post processing the added edge
+        for e in list(G_spread.edges(passed_nodes,data='weight')):
+            # if the spread edge is conflict with the original thesauri, remove the spread one
+            if G_thes.get_edge_data(*e[:2], default={}).get('weight',0) * e[2] < 0:
+                G_spread.remove_edge(*e[:2])
 
     return G_spread
 
