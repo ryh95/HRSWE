@@ -7,7 +7,7 @@ import numpy as np
 
 from evaluate import SynAntClyEvaluator
 from model import generate_syn_ant_graph, generate_spread_graph, generate_spread_graph_1, generate_spread_graph_2, \
-    generate_spread_graph_3
+    generate_spread_graph_3, generate_spread_graph_4, generate_spread_graph_5
 
 
 class BaseExperiments(object):
@@ -71,6 +71,16 @@ class HRSWEExperiments(BaseExperiments):
     def __init__(self,model,val_evaluator,test_evaluator,dataset,config):
         super().__init__(model,val_evaluator,test_evaluator,dataset,config)
 
+        emb = [vec for vec in dataset.emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32).T
+
+        # configuration: normalize vector
+        emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
+        emb = emb / emb_norm
+        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+        d,n = emb.shape
+        W = emb.T @ emb
+
         adj_pos,adj_neg,G = generate_syn_ant_graph(dataset.words,dataset.syn_pairs,dataset.ant_pairs)
         # G_spread = generate_spread_graph(G,0.4,0.6)
         # adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
@@ -79,12 +89,16 @@ class HRSWEExperiments(BaseExperiments):
         #     'adj_neg':adj_neg,
         #     'adj_spread':adj_spread
         # }
-        G_spread = generate_spread_graph_1(G)
-        adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
+        # G_spread = generate_spread_graph_5(G)
+        # adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
+        adj_spread = nx.adjacency_matrix(G, nodelist=dataset.words)
         self.model_kws = {
             'adj_pos': adj_pos,
             'adj_neg': adj_neg,
             'adj_spread': adj_spread,
+            'W':W,
+            'n':n,
+            'd':d
         }
 
 
@@ -99,13 +113,25 @@ class MatrixExperiments(BaseExperiments):
     def __init__(self,model,val_evaluator,test_evaluator,dataset,config):
         super().__init__(model,val_evaluator,test_evaluator,dataset,config)
 
+        emb = [vec for vec in dataset.emb_dict.values()]
+        emb = np.vstack(emb).astype(np.float32).T
+
+        # configuration: normalize vector
+        emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
+        emb = emb / emb_norm
+        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+
+        W = emb.T @ emb
+
         adj_pos,adj_neg,G = generate_syn_ant_graph(dataset.words,dataset.syn_pairs,dataset.ant_pairs)
-        G_spread = generate_spread_graph_3(G)
-        adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
+        # G_spread = generate_spread_graph_4(G,dataset)
+        # adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
+        adj_spread = nx.adjacency_matrix(G,nodelist=dataset.words)
         self.model_kws = {
             'adj_pos':adj_pos,
             'adj_neg':adj_neg,
             'adj_spread':adj_spread,
+            'W':W,
         }
 
     def get_val_score(self, feasible_hyps):

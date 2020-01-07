@@ -150,16 +150,29 @@ def generate_spread_graph_3(G_thes):
 
     return G_spread
 
-def generate_spread_graph_4(G_thes,words):
+def generate_spread_graph_4(G_thes,dataset):
 
-    adj = nx.adjacency_matrix(G_thes, nodelist=words)
+    # emb = [vec for vec in dataset.emb_dict.values()]
+    # emb = np.vstack(emb).astype(np.float32).T
+    #
+    # # normalize vector
+    # emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
+    # emb = emb / emb_norm
+    # # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
+    #
+    # W = emb.T @ emb
+    # W = np.abs(W)
+
+
+    adj = nx.adjacency_matrix(G_thes, nodelist=dataset.words)
     for i in range(1):
+        # adj = adj.multiply(W)
         adj = adj @ adj
         adj = np.tanh(adj)
         # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
 
     G_spread = nx.from_numpy_array(adj.toarray())
-    id2words = {id:word for id,word in enumerate(words)}
+    id2words = {id:word for id,word in enumerate(dataset.words)}
     G_spread = nx.relabel_nodes(G_spread,id2words)
 
     return G_spread
@@ -176,9 +189,11 @@ def generate_spread_graph_5(G_thes):
     G_spread.add_nodes_from(G_thes.nodes)
 
     nodes = G_thes.nodes
-    sel_nodes = random.sample(nodes,int(len(nodes)*0.8))
+    nodes = list(nodes)
+    # sel_nodes = random.sample(nodes,int(2*len(nodes)))
 
-    for cur_node in tqdm(sel_nodes):
+    for _ in tqdm(range(2*len(nodes))):
+        cur_node = random.choice(nodes)
         # skip the no neighbor nodes
         if not list(G_thes.neighbors(cur_node)): continue
 
@@ -259,7 +274,8 @@ class HRSWE(object):
 
     def __init__(self, *hyps, **kwargs):
 
-        self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+        # self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+        self.beta0, self.beta1, self.beta2, self.mis_syn, self.pos, self.neg = hyps
         # self.beta0, self.beta1, self.beta2 = hyps
         # beta0,beta1, beta2,beta3,beta4 = hyps
 
@@ -269,6 +285,25 @@ class HRSWE(object):
         self.adj_pos = kwargs['adj_pos']
         self.adj_neg = kwargs['adj_neg']
         self.adj_spread = kwargs['adj_spread']
+        self.W = kwargs['W']
+        self.n = kwargs['n']
+        self.d = kwargs['d']
+
+    def generate_spread_graph(self):
+        '''
+        generate graph 6
+        :return:
+        '''
+        adj = self.adj_spread.astype(float)
+        adj[adj>0] = self.pos
+        adj[adj<0] = self.neg
+        for i in range(1):
+            # adj = adj.multiply(W)
+            adj = adj @ adj
+            adj = np.tanh(adj)
+            # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
+
+        return adj
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
         """
@@ -283,19 +318,12 @@ class HRSWE(object):
 
         :return: nxd ndarray new word embedding
         """
-        emb = [vec for vec in emb_dict.values()]
-        emb = np.vstack(emb).astype(np.float32).T
-
-        # configuration: normalize vector
-        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
-        emb = emb / emb_norm
-        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
-
-        d, n = emb.shape
-        W = emb.T @ emb
-
+        W,n,d = self.W,self.n,self.d
+        adj = self.generate_spread_graph()
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
-        W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+        # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
+        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
+            W - (-1)) + self.mis_syn * adj
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
         #           self.mis_syn * self.adj_spread.multiply(W)
 
@@ -335,28 +363,40 @@ class HRSWE(object):
 class RetrofittedMatrix(object):
 
     def __init__(self, *hyps,**kwargs):
-        self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+        # self.beta0, self.beta1, self.beta2, self.mis_syn = hyps
+        self.beta0, self.beta1, self.beta2, self.mis_syn, self.pos, self.neg = hyps
+        # self.beta0, self.beta1, self.beta2, self.mis_syn, self.ths = hyps
 
         self.adj_pos = kwargs['adj_pos']
         self.adj_neg = kwargs['adj_neg']
         self.adj_spread = kwargs['adj_spread']
+        self.W = kwargs['W']
 
+    def generate_spread_graph(self):
+        '''
+        generate graph 6
+        :return:
+        '''
+        adj = self.adj_spread.astype(float)
+        adj[adj>0] = self.pos
+        adj[adj<0] = self.neg
+        for i in range(1):
+            # adj = adj.multiply(W)
+            adj = adj @ adj
+            adj = np.tanh(adj)
+            # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
+
+        return adj
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
-
-        emb = [vec for vec in emb_dict.values()]
-        emb = np.vstack(emb).astype(np.float32).T
-
-        # normalize vector
-        emb_norm = np.linalg.norm(emb,axis=0)[np.newaxis,:]
-        emb = emb / emb_norm
-        # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
-
-        W = emb.T @ emb
+        W = self.W
+        adj = self.generate_spread_graph()
+        # W_ths = np.zeros_like(W)
+        # W_ths[np.abs(W)>=self.ths] = 1
 
         # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
         #     W - (-1))
-        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
-            W - (-1)) + self.mis_syn * self.adj_spread
+        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
+            W - (-1)) + self.mis_syn * adj
 
         # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(
         #     np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
