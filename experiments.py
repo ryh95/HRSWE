@@ -4,6 +4,7 @@ from math import inf
 
 import networkx as nx
 import numpy as np
+from scipy.linalg import svd
 
 from evaluate import SynAntClyEvaluator
 from model import generate_syn_ant_graph, generate_spread_graph, generate_spread_graph_1, generate_spread_graph_2, \
@@ -75,13 +76,15 @@ class HRSWEExperiments(BaseExperiments):
         emb = np.vstack(emb).astype(np.float32).T
 
         # configuration: normalize vector
-        emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
-        emb = emb / emb_norm
+        # emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
+        # emb = emb / emb_norm
         # print(np.linalg.norm(emb,axis=0)[np.newaxis,:])
         d,n = emb.shape
         W = emb.T @ emb
 
         adj_pos,adj_neg,G = generate_syn_ant_graph(dataset.words,dataset.syn_pairs,dataset.ant_pairs)
+        adj_spread = nx.adjacency_matrix(G, nodelist=dataset.words)
+
         # G_spread = generate_spread_graph(G,0.4,0.6)
         # adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
         # self.model_kws = {
@@ -91,7 +94,25 @@ class HRSWEExperiments(BaseExperiments):
         # }
         # G_spread = generate_spread_graph_5(G)
         # adj_spread = nx.adjacency_matrix(G_spread, nodelist=dataset.words)
-        adj_spread = nx.adjacency_matrix(G, nodelist=dataset.words)
+
+        # u,s,vt = svd(adj_pos.toarray())
+        # explain_ratio = np.cumsum(s ** 2) / np.sum(s ** 2)
+        # sel_rank = np.argwhere(explain_ratio>0.9)[0][0]
+        #
+        # adj_pos = u[:,:sel_rank] * s[:sel_rank] @ vt[:sel_rank,:]
+        # # #
+        # u, s, vt = svd(adj_neg.toarray())
+        # explain_ratio = np.cumsum(s ** 2) / np.sum(s ** 2)
+        # sel_rank = np.argwhere(explain_ratio > 0.9)[0][0]
+        #
+        # adj_neg = u[:, :sel_rank] * s[:sel_rank] @ vt[:sel_rank, :]
+        #
+        # u,s,vt = svd(adj_spread.toarray())
+        # explain_ratio = np.cumsum(s ** 2) / np.sum(s ** 2)
+        # sel_rank = np.argwhere(explain_ratio>0.9)[0][0]
+        #
+        # adj_spread = u[:,:sel_rank] * s[:sel_rank] @ vt[:sel_rank,:]
+
         self.model_kws = {
             'adj_pos': adj_pos,
             'adj_neg': adj_neg,

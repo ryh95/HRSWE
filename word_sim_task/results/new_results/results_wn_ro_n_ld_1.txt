@@ -1,3 +1,0 @@
-Spearman correlation of scores on SIMLEX999 0.7094891164703893
-Spearman correlation of scores on SIMVERB3000-test 0.662557637136724
-Spearman correlation of scores on SIMVERB500-dev 0.6558783774052936

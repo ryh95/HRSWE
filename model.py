@@ -8,6 +8,7 @@ import numpy as np
 
 
 from scipy import linalg
+from scipy.sparse import csr_matrix
 from scipy.spatial.distance import pdist
 from scipy.spatial.distance import squareform
 from sklearn.preprocessing import StandardScaler
@@ -300,9 +301,12 @@ class HRSWE(object):
         for i in range(1):
             # adj = adj.multiply(W)
             adj = adj @ adj
-            adj = np.tanh(adj)
+            # adj = np.tanh(adj)
             # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
+            adj[adj>1] = 1
+            adj[adj<-1] = -1
 
+        # adj.eliminate_zeros()
         return adj
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
@@ -319,11 +323,50 @@ class HRSWE(object):
         :return: nxd ndarray new word embedding
         """
         W,n,d = self.W,self.n,self.d
-        adj = self.generate_spread_graph()
+        adj_spread = self.generate_spread_graph()
+
+        # adj_spread[self.adj_pos>0] = 0
+        # adj_spread[self.adj_neg>0] = 0
+
+        adj_pos_spread = adj_spread.copy()
+        adj_pos_spread[adj_spread < 0] = 0
+        adj_pos_spread.eliminate_zeros()
+        # id_changed = set(zip(*adj_pos_spread.nonzero())) & set(zip(*self.adj_pos.nonzero()))
+        # if id_changed:
+        #     adj_pos_spread[tuple(zip(*id_changed))] = 0
+        #     adj_pos_spread.eliminate_zeros()
+
+        # data = np.ones(adj_pos_spread.nnz)
+        # adj_pos_spread_id = csr_matrix((data,adj_pos_spread.nonzero()),adj_pos_spread.shape)
+        # sel_id = adj_pos_spread_id - self.adj_pos
+        # adj_pos_spread = adj_pos_spread.multiply(sel_id)
+
+        adj_neg_spread = adj_spread.copy()
+        adj_neg_spread[adj_spread > 0] = 0
+        adj_neg_spread.eliminate_zeros()
+        # id_changed = set(zip(*adj_neg_spread.nonzero())) & set(zip(*self.adj_neg.nonzero()))
+        # if id_changed:
+        #     adj_neg_spread[tuple(zip(*id_changed))] = 0
+        #     adj_neg_spread.eliminate_zeros()
+
+        # adj_neg_spread[adj_spread < 0] = 1
+
+
+        # adj_spread_pos = adj_spread[adj_spread>0]
+        # adj_spread_neg = adj_spread[adj_spread<0]
+
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1))
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(W - (-1)) + self.mis_syn * self.adj_spread
-        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
-            W - (-1)) + self.mis_syn * adj
+
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
+        #     W - (-1)) + self.mis_syn * adj
+
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta1 * self.adj_neg.multiply(W - np.min(W)) + \
+        #           self.mis_syn * adj_spread.multiply(W)
+        W_prime = self.beta0 * W + self.beta1 * self.pos * self.adj_pos.multiply(
+            np.max(W) - W) - self.beta1 * np.abs(self.neg) * self.adj_neg.multiply(W - np.min(W)) + \
+                 self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta1 * adj_neg_spread.multiply(W - np.min(W))
+
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
         #           self.mis_syn * self.adj_spread.multiply(W)
 
@@ -333,7 +376,7 @@ class HRSWE(object):
         # W_prime = self.beta0 * W - self.beta1 * self.adj_pos.multiply(W) - self.beta2 * self.adj_neg.multiply(W) + \
         #           self.beta1 * self.adj_pos.multiply(1) + self.beta2 * self.adj_neg.multiply(-1) + self.adj_spread
 
-        W_prime = np.clip(W_prime, -1, 1)
+        # W_prime = np.clip(W_prime, -1, 1)
 
         scaler = StandardScaler()
         W_prime = scaler.fit_transform(W_prime)
@@ -345,7 +388,11 @@ class HRSWE(object):
         # turbo: use divide and conquer algorithm or not
         lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
 
-        new_emb = Q_s @ np.diag(lamb_s ** (1 / 2))
+        Q_s = Q_s[:,::-1]
+        lamb_s = lamb_s[::-1]
+        # lamb_s[lamb_s < 0] = 0
+
+        new_emb = Q_s * (lamb_s ** (1 / 2))
 
         # U, Sigma, VT = randomized_svd(W_prime,n_components=d,n_iter=100) # svd method 1
 
@@ -395,8 +442,10 @@ class RetrofittedMatrix(object):
 
         # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta2 * self.adj_neg.multiply(
         #     W - (-1))
-        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
-            W - (-1)) + self.mis_syn * adj
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(1 - W) - self.beta1 * self.adj_neg.multiply(
+        #     W - (-1)) + self.mis_syn * adj
+
+        W_prime = self.beta0 * W + self.beta1 * (self.adj_pos @ self.adj_pos) - self.beta2 * (self.adj_neg @ self.adj_neg) + self.mis_syn * adj
 
         # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(
         #     np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
