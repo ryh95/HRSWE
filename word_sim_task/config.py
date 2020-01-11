@@ -27,20 +27,24 @@ hrswe_config = {
     'exp_config':hrswe_exp_config,
     'hyp_tune_func':gp_minimize,
     'hyp_opt_space':[
-        Categorical([1]),# beta0
-        # Real(0,1),
+        # Categorical([1]),# beta0
+        Real(0,1),
         # Real(10**-3,10**2,'log-uniform'),
         # Real(10**-3,10**2,'log-uniform'),
         Real(0,1),# beta1
-        # Real(0,1),# beta2
-        Categorical([0]),# beta0
+        Real(0,1),# beta2
+        # Real(0,1),# beta3
+        # Real(0,1),# beta4
+        # Categorical([0]),# beta0
         # Real(0,1), # mis_syn
         # Real(10**-3,10**2,'log-uniform'),
         Categorical([0]),
         Real(0,1), # W_max
+        # Real(10**-3,10**2,'log-uniform'),
         # Categorical([1]),
         # Categorical([-1]),
-        Real(-1,0), # W_min
+        Real(0,1), # W_min
+        # Real(10**-3,10**2,'log-uniform')
         # Real(-1,1) # ths
         # Real(10**-3,10**2,'log-uniform'),# beta3
         # Real(10**-3,10**2,'log-uniform'),# beta4
@@ -121,8 +125,8 @@ ar_config = {
     'hyp_opt_space':[
         Real(0,1), # syn mar
         Real(0,1), # ant mar
-        # Categorical([64]), # batch size
-        Integer(2,100), # batch size
+        Categorical([64,128,256]), # batch size
+        # Integer(2,100), # batch size
         Integer(1,20), # epoch num
         Real(10**-9,10**0,'log-uniform'), # l2 reg
     ],

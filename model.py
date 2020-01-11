@@ -297,16 +297,16 @@ class HRSWE(object):
         '''
         adj = self.adj_spread.astype(float)
         adj[adj>0] = self.pos
-        adj[adj<0] = self.neg
+        adj[adj<0] = -self.neg
         for i in range(1):
-            # adj = adj.multiply(W)
+            # adj = adj.multiply(self.W)
             adj = adj @ adj
             # adj = np.tanh(adj)
             # adj = adj.multiply((adj <= 1).multiply(adj >= -1))
             adj[adj>1] = 1
             adj[adj<-1] = -1
 
-        # adj.eliminate_zeros()
+        adj.eliminate_zeros()
         return adj
 
     def specialize_emb(self,emb_dict,syn_pairs,ant_pairs):
@@ -363,9 +363,15 @@ class HRSWE(object):
 
         # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta1 * self.adj_neg.multiply(W - np.min(W)) + \
         #           self.mis_syn * adj_spread.multiply(W)
-        W_prime = self.beta0 * W + self.beta1 * self.pos * self.adj_pos.multiply(
-            np.max(W) - W) - self.beta1 * np.abs(self.neg) * self.adj_neg.multiply(W - np.min(W)) + \
-                 self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta1 * adj_neg_spread.multiply(W - np.min(W))
+
+        W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(
+            np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
+                 self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta2 * adj_neg_spread.multiply(W - np.min(W))
+
+        # W_prime = self.beta0 * W + self.beta1 * self.pos * self.adj_pos * (
+        #     np.max(W) - W) - self.beta1 * np.abs(self.neg) * self.adj_neg * (W - np.min(W)) + \
+        #           self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta1 * adj_neg_spread.multiply(
+        #     W - np.min(W))
 
         # W_prime = self.beta0*W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
         #           self.mis_syn * self.adj_spread.multiply(W)
@@ -380,17 +386,19 @@ class HRSWE(object):
 
         scaler = StandardScaler()
         W_prime = scaler.fit_transform(W_prime)
+        # W_prime = W_prime - W_prime.mean(axis=0)
 
-        W_hat = nearestPD(W_prime)
+        # W_hat = nearestPD(W_prime)
+        W_prime = (W_prime + W_prime.T)/2
 
         # choose d largest eigenvectors
         # ref: https://stackoverflow.com/a/12168664
         # turbo: use divide and conquer algorithm or not
-        lamb_s, Q_s = linalg.eigh(W_hat, eigvals=(n - d, n - 1))
+        lamb_s, Q_s = linalg.eigh(W_prime, eigvals=(n - d, n - 1))
 
         Q_s = Q_s[:,::-1]
         lamb_s = lamb_s[::-1]
-        # lamb_s[lamb_s < 0] = 0
+        lamb_s[lamb_s < 0] = 0
 
         new_emb = Q_s * (lamb_s ** (1 / 2))
 

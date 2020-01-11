@@ -1,10 +1,12 @@
 import pickle
-from collections import defaultdict
+import time
+from collections import defaultdict, OrderedDict
 from math import inf
 
 import networkx as nx
 import numpy as np
 from scipy.linalg import svd
+from sklearn.preprocessing import StandardScaler
 
 from evaluate import SynAntClyEvaluator
 from model import generate_syn_ant_graph, generate_spread_graph, generate_spread_graph_1, generate_spread_graph_2, \
@@ -35,9 +37,11 @@ class BaseExperiments(object):
     def obtain_best_emb(self):
 
         hyp_tune_func = self.config['hyp_tune_func']
+        start = time.time()
         res = hyp_tune_func(self.get_val_score, self.config['hyp_opt_space'],
                             **self.config['tune_func_config'])
 
+        self.tune_time = time.time() - start
         self.best_hyps = res.x
 
     def test_best_emb(self):
@@ -52,6 +56,7 @@ class BaseExperiments(object):
                 'test_res':self.test_evaluator.cur_results,
                 'best_val_res':self.val_evaluator.best_results,
                 'best_hyps':self.best_hyps,
+                'tune_time':self.tune_time,
                 'config':self.config
             }
             if isinstance(self.test_evaluator,SynAntClyEvaluator):
@@ -74,6 +79,9 @@ class HRSWEExperiments(BaseExperiments):
 
         emb = [vec for vec in dataset.emb_dict.values()]
         emb = np.vstack(emb).astype(np.float32).T
+
+        scaler = StandardScaler()
+        emb = scaler.fit_transform(emb.T).T
 
         # configuration: normalize vector
         # emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
@@ -127,6 +135,16 @@ class ARExperiments(BaseExperiments):
 
     def __init__(self,model,val_evaluator,test_evaluator,dataset,config):
         super().__init__(model,val_evaluator,test_evaluator,dataset,config)
+
+        # standardize the embedding
+        # emb = [vec for vec in dataset.emb_dict.values()]
+        # emb = np.vstack(emb)
+        #
+        # scaler = StandardScaler()
+        # emb = scaler.fit_transform(emb)
+        #
+        # self.dataset.emb_dict = OrderedDict((w,emb[i,:]) for i,w in enumerate(dataset.emb_dict.keys()))
+
         self.model_kws = {}
 
 class MatrixExperiments(BaseExperiments):

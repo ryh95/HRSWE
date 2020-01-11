@@ -1,6 +1,8 @@
+import itertools
 import os
 import random
 from collections import defaultdict
+from itertools import chain
 from os import path
 from os.path import join
 
@@ -145,6 +147,16 @@ def generate_sub_thesauri(in_fthesauri, out_fthesauri, vocab):
                 if w1[3:] in vocab and w2[3:] in vocab:
                     f_out.write(w1+' '+w2+'\n')
 
+        # use frozen set to remove the reversed tuple
+        # ths = set()
+        # with open(in_fthesauri, 'r') as f:
+        #     for line in f:
+        #         w1, w2 = line.strip().split()
+        #         if w1[3:] in vocab and w2[3:] in vocab and w1 != w2:
+        #             ths.add(frozenset([w1, w2]))
+        # with open(out_fthesauri, 'w') as f:
+        #     f.writelines(' '.join(list(p)) + '\n' for p in ths)
+
 def get_all_words_in_constraint(word_sim_fname):
     vocab = set()
     with open(word_sim_fname, 'r') as f:
@@ -273,6 +285,54 @@ def generate_adv3(ratio, thesauri, tasks):
         for line in ant_pairs:
             f_ant_out.write(' '.join('en_'+w for w in line)+'\n')
 
+def generate_adv4(ratio, thesauri, tasks):
+    task_syn_pairs = set()
+    task_ant_pairs = set()
+    for k, v in tasks.items():
+        for p,s in zip(v['X'],v['y']):
+            if s > 7:
+                task_syn_pairs.add(frozenset(p))
+            elif s < 3:
+                task_ant_pairs.add(frozenset(p))
+
+    ths_syn_pairs, ths_ant_pairs = set(), set()
+    with open(thesauri['syn_fname'], 'r') as f_syn:
+        for line in f_syn:
+            word_pair = line.split()
+            word_pair = frozenset(word[3:] for word in word_pair)  # remove the 'en-' prefix
+            ths_syn_pairs.add(word_pair)
+    with open(thesauri['ant_fname'], 'r') as f_ant:
+        for line in f_ant:
+            word_pair = line.split()
+            word_pair = frozenset(word[3:] for word in word_pair)  # remove the 'en-' prefix
+            ths_ant_pairs.add(word_pair)
+
+    # task_syn_pairs = task_syn_pairs & the_syn_pairs
+    # task_ant_pairs = task_ant_pairs & ant_pairs
+
+    sel_human_syn_pairs = itertools.combinations(chain.from_iterable(task_syn_pairs),2)
+    sel_ths_syn_pairs = set(map(frozenset,sel_human_syn_pairs)) & ths_syn_pairs
+
+    sel_human_ant_pairs = itertools.combinations(chain.from_iterable(task_ant_pairs),2)
+    sel_ths_ant_pairs = set(map(frozenset,sel_human_ant_pairs)) & ths_ant_pairs
+
+
+
+    syn_subset = set(random.sample(sel_ths_syn_pairs, int(len(sel_ths_syn_pairs) * ratio)))
+    ant_subset = set(random.sample(sel_ths_ant_pairs, int(len(sel_ths_ant_pairs) * ratio)))
+    ths_syn_pairs -= syn_subset
+    task_ant_pairs |= syn_subset
+
+    ths_ant_pairs -= ant_subset
+    ths_syn_pairs |= ant_subset
+
+    # write into files
+    pa, fname = path.split(thesauri['syn_fname'])
+    with open(join(pa, 'adv_' + fname), 'w') as f_syn_out:
+        f_syn_out.writelines(' '.join('en_' + w for w in p) + '\n' for p in ths_syn_pairs)
+    pa, fname = path.split(thesauri['ant_fname'])
+    with open(join(pa, 'adv_' + fname), 'w') as f_ant_out:
+        f_ant_out.writelines(' '.join('en_' + w for w in p) + '\n' for p in ths_ant_pairs)
 
 def load_SimVerb3500(simverb_fname):
     X, y = [], []

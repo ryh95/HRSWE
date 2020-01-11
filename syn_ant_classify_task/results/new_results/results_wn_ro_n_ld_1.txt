@@ -1,8 +1,0 @@
-best f1 on dev: 2.677153, threshold: 0.076923
-Average time spent:  6.1
-best th: 0.051282
-best beta1: 16.237767
-best beta2: 100.000000
-test adjective: 0.932271
-test noun: 0.818557
-test verb: 0.917104
