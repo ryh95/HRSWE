@@ -5,7 +5,7 @@ from constants import THESAURUS_DIR
 from dataset import Dataset
 from model import AR, HRSWE, LHRSWE
 from word_sim_task.config import ori_thesauri, ar_config, hrswe_config, lhrswe_config
-from experiments import BaseExperiments, HRSWEExperiments
+from experiments import BaseExperiments, HRSWEExperiments, ARExperiments
 from utils import generate_sub_thesauri
 from evaluate import WordSimEvaluator
 
@@ -33,12 +33,9 @@ ar_val = WordSimEvaluator(val_tasks)
 ar_test = WordSimEvaluator(test_tasks)
 
 # experiments
-# ar_exp = BaseExperiments(AR,ar_val,ar_test,dataset,ar_config)
+ar_exp = ARExperiments(AR,ar_val,ar_test,dataset,ar_config)
 hrswe_exp = HRSWEExperiments(HRSWE,hrswe_val,hrswe_test,dataset,hrswe_config)
 
 # run exps
 hrswe_exp.run()
-
-# ar_test_score = ar_exp.run()
-# ar_test_fscore = ar_exp.config['exp_config']['exp_name'] + '_score' + '.npy'
-# np.save(ar_test_fscore, ar_test_score)
+ar_exp.run()

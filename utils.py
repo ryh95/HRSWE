@@ -271,9 +271,12 @@ def generate_adv3(ratio, thesauri, tasks):
 
     # adversarial approach 1
     # choose a portion of sel_syn_pairs and put them into antonym pairs
-    subset = set(random.sample(inter_syn_pairs,int(len(inter_syn_pairs)*ratio)))
-    syn_pairs -= subset
-    ant_pairs |= subset
+    # ant_subset = set(random.sample(inter_ant_pairs,int(len(inter_ant_pairs)*ratio)))
+    syn_subset = set(random.sample(inter_syn_pairs,int(len(inter_syn_pairs)*ratio)))
+    syn_pairs -= syn_subset
+    ant_pairs |= syn_subset
+    # ant_pairs -= ant_subset
+    # syn_pairs |= ant_subset
 
     # write into files
     pa,fname = path.split(thesauri['syn_fname'])

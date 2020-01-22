@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from constants import THESAURUS_DIR
 from dataset import Dataset
-from experiments import BaseExperiments
+from experiments import BaseExperiments, ARExperiments, HRSWEExperiments
 from model import AR, HRSWE
 from syn_ant_classify_task.config import ori_thesauri, adv_thesauri, ths, ar_config, hrswe_config
 
@@ -35,14 +35,9 @@ ar_val = SynAntClyEvaluator(val_tasks, ths)
 ar_test = SynAntClyEvaluator(test_tasks,ths)
 
 # experiments
-ar_exp = BaseExperiments(AR,ar_val,ar_test,dataset,ar_config)
-hrswe_exp = BaseExperiments(HRSWE,hrswe_val,hrswe_test,dataset,hrswe_config)
 
-# run exps
-hrswe_test_score = hrswe_exp.run()
-hrswe_test_fscore = hrswe_exp.config['exp_config']['exp_name'] + '_score' + '.npy'
-np.save(hrswe_test_fscore, hrswe_test_score)
+hrswe_exp = HRSWEExperiments(HRSWE,hrswe_val,hrswe_test,dataset,hrswe_config)
+hrswe_exp.run()
 
-ar_test_score = ar_exp.run()
-ar_test_fscore = ar_exp.config['exp_config']['exp_name'] + '_score' + '.npy'
-np.save(ar_test_fscore, ar_test_score)
+ar_exp = ARExperiments(AR,ar_val,ar_test,dataset,ar_config)
+ar_exp.run()

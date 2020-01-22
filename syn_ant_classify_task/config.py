@@ -37,6 +37,9 @@ hrswe_config = {
         # Categorical([1]),# beta0
         Real(0,1),
         Real(10**-1,10**1,'log-uniform'),
+        # Real(0,1),
+        # Real(0,1),
+        # Real(0,1),
         Real(10**-1,10**1,'log-uniform'),
         # Real(0,1),# beta1
         # Real(0,1),# beta2
@@ -75,7 +78,7 @@ ar_config = {
     'hyp_opt_space':[
         Real(0,1), # syn mar
         Real(0,1), # ant mar
-        Categorical([64,128,256]), # batch size
+        Categorical([32,64,128,256,512,1024]), # batch size
         Integer(1,20), # epoch num
         Real(10**-9,10**0,'log-uniform'), # l2 reg
     ],

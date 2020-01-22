@@ -368,6 +368,8 @@ class HRSWE(object):
             np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W)) + \
                  self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta2 * adj_neg_spread.multiply(W - np.min(W))
 
+        # W_prime = self.beta0 * W + self.beta1 * self.adj_pos.multiply(np.max(W) - W) - self.beta2 * self.adj_neg.multiply(W - np.min(W))
+
         # W_prime = self.beta0 * W + self.beta1 * self.pos * self.adj_pos * (
         #     np.max(W) - W) - self.beta1 * np.abs(self.neg) * self.adj_neg * (W - np.min(W)) + \
         #           self.beta1 * adj_pos_spread.multiply(np.max(W) - W) + self.beta1 * adj_neg_spread.multiply(

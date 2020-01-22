@@ -32,7 +32,8 @@ class BaseExperiments(object):
         score,_ = self.val_evaluator.eval_emb_on_tasks(sp_emb_dict)
         self.val_evaluator.update_results()
 
-        return -score # minimize to optimize
+        # minimize to optimize, 10 is used to handle exception
+        return -score if not np.isnan(score) else 10
 
     def obtain_best_emb(self):
 
@@ -51,8 +52,10 @@ class BaseExperiments(object):
 
     def pack_dump_res(self):
         if self.config['exp_config']['save_res']:
+            final_emb = {
+                'best_emb_dict':self.test_evaluator.cur_emb
+            }
             final_res = {
-                'best_emb_dict':self.test_evaluator.cur_emb,
                 'test_res':self.test_evaluator.cur_results,
                 'best_val_res':self.val_evaluator.best_results,
                 'best_hyps':self.best_hyps,
@@ -61,6 +64,8 @@ class BaseExperiments(object):
             }
             if isinstance(self.test_evaluator,SynAntClyEvaluator):
                 final_res['best_th'] = self.test_evaluator.cur_results['th']
+            with open(self.config['exp_config']['exp_name']+'_emb' + '.pickle', 'wb') as handle:
+                pickle.dump(final_emb, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
             with open(self.config['exp_config']['exp_name']+'_results' + '.pickle', 'wb') as handle:
                 pickle.dump(final_res, handle, protocol=pickle.HIGHEST_PROTOCOL)
