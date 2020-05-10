@@ -83,6 +83,7 @@ class Dataset(object):
         # self.emb_fname = 'paper_results/wn_ro_pd_ld_0'
 
         if os.path.isfile(emb_fname + '.pickle'):
+            print('embedding found, loading...')
             with open(emb_fname + '.pickle','rb') as f:
                 emb_dict = pickle.load(f)
         else:
