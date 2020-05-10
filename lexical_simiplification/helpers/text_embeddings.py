@@ -210,11 +210,15 @@ class PickleEmbedding(object):
 		self.vocab = None
 		self.id2word = None
 
+	def read_emb_dict(self, f):
+		if isinstance(f,dict): return f
+		with open(f,'rb') as handle:
+			return pickle.load(handle)
+
 	def load_embeddings(self, filepath, limit, language='en', print_loading=False, skip_first_line=False,
 						min_one_letter=False, special_tokens=None, normalize=False):
 		print('load embedding...')
-		with open(filepath,'rb') as f:
-			self.emb_dict = pickle.load(f)
+		self.emb_dict = self.read_emb_dict(filepath)
 		print('load finished')
 		self.emb = np.stack(self.emb_dict.values()) # number of words x d
 		self.vocab = list(self.emb_dict.keys())
