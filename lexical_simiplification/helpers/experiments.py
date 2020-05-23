@@ -1,9 +1,11 @@
 import pickle
+import time
 from datetime import datetime
 from pathlib import Path
 
 import networkx as nx
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from skopt import dump
 from skopt.space import Integer, Real
 import numpy as np
@@ -48,6 +50,8 @@ class LightLSExperiments(object):
             self.targets = pickle.load(f_targets)
         with open(config['fcandidates'], 'rb') as f_candidates:
             self.candidates = pickle.load(f_candidates)
+        with open(config['ftags'],'rb') as f_tags:
+            self.pos_tags = pickle.load(f_tags)
 
     def minimize(self, space, **min_args):
         minimizer = self.config['minimizer']
@@ -63,10 +67,10 @@ class LightLSExperiments(object):
             print('prepare val test sentences')
             lines = self.config['fdata'].read_text()
             sens = [line.split() for line in lines.split('\n')[:-1]]
-            X_val, X_test, val_targets, test_targets, val_candidates, test_candidates = \
-                train_test_split(sens,self.targets,self.candidates, test_size=test_size)
-            Xs = [[X_val,X_test],[val_targets,test_targets],[val_candidates,test_candidates]]
-            fs,types = ['fdata','ftarget','fcandidates'],['val','test']
+            X_val, X_test, val_targets, test_targets, val_candidates, test_candidates, val_tags, test_tags = \
+                train_test_split(sens,self.targets,self.candidates,self.pos_tags, test_size=test_size)
+            Xs = [[X_val,X_test],[val_targets,test_targets],[val_candidates,test_candidates],[val_tags,test_tags]]
+            fs,types = ['fdata','ftarget','fcandidates','ftags'],['val','test']
             for i,f in enumerate(fs):
                 fstem = self.config[f].stem
                 for j,type in enumerate(types):
@@ -76,7 +80,7 @@ class LightLSExperiments(object):
         else:
             print('load val test sentences')
             Xs = []
-            fs, types = ['fdata', 'ftarget', 'fcandidates'], ['val', 'test']
+            fs, types = ['fdata', 'ftarget', 'fcandidates', 'ftags'], ['val', 'test']
             for i, f in enumerate(fs):
                 fstem = self.config[f].stem
                 stem = []
@@ -93,7 +97,7 @@ class LightLSExperiments(object):
                       "similarity_threshold": self.config['tholdsim'], "context_window_size": feasible_point[1],
                       "complexity_threshold": self.config['tholdcmplx']}
         simplifier = lightls.LightLS(self.embeddings, self.wfs, parameters, self.stopwords)
-        simplifications = simplifier.simplify_lex_mturk(self.eval_data, self.eval_targets)
+        simplifications = simplifier.simplify_lex_mturk(self.eval_data, self.eval_targets, self.eval_pos_tags)
         acc, change = simplifier.evaluate_lex_mturk_simplification(simplifications, self.eval_candidates)
         return -acc
 
@@ -103,16 +107,20 @@ class LightLSExperiments(object):
         Xs = self.split_lex_mturk()
 
         # optimize on the val data and test on the testing data
-        self.eval_data, self.eval_targets, self.eval_candidates = [x[0] for x in Xs]
-        x0 = [2,5,0.03]
+        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[0] for x in Xs]
+        # lines = self.config['fdata'].read_text()
+        # sens = [line.split() for line in lines.split('\n')[:-1]]
+        # self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = sens,self.targets,self.candidates,self.pos_tags
+        x0 = [10,5,10**-4]
         space = [
-            Integer(2, 300),
+            Integer(2, 50),
             Integer(2, 10),
-            Real(10 ** -5, 10 ** -1,'log-uniform')
+            Real(10 ** -6, 10 ** -1,'log-uniform')
         ]
         res = self.minimize(space, x0=x0, n_calls=50, verbose=True)
 
-        self.eval_data, self.eval_targets, self.eval_candidates = [x[1] for x in Xs]
+        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[1] for x in Xs]
+        # print(f'data acc: {-res.fun}')
         print(f'test acc: {-self.objective(res.x)}')
         dump(res,'res-hyp.pickle',store_objective=False)
 
@@ -121,13 +129,14 @@ class SpLightLSExperiments(LightLSExperiments):
     def __init__(self,sp_model,dataset,config):
         self.config = config
         self.sp_model = sp_model
+        self.sp_time = []
         self.dataset = dataset
         if self.config['exp_name'] == 'hrswe':
             emb = [vec for vec in dataset.emb_dict.values()]
             emb = np.vstack(emb).astype(np.float32).T
 
-            # scaler = StandardScaler()
-            # emb = scaler.fit_transform(emb.T).T
+            scaler = StandardScaler()
+            emb = scaler.fit_transform(emb.T).T
 
             # configuration: normalize vector
             # emb_norm = np.linalg.norm(emb, axis=0)[np.newaxis, :]
@@ -161,15 +170,24 @@ class SpLightLSExperiments(LightLSExperiments):
             self.targets = pickle.load(f_targets)
         with open(config['fcandidates'], 'rb') as f_candidates:
             self.candidates = pickle.load(f_candidates)
+        with open(config['ftags'],'rb') as f_tags:
+            self.pos_tags = pickle.load(f_tags)
 
     def sp_objective(self,feasible_point):
+        start = time.time()
         model = self.sp_model(*feasible_point, **self.model_kws)
         sp_emb = model.specialize_emb(self.dataset.emb_dict,
                                       self.dataset.syn_pairs, self.dataset.ant_pairs)
+        self.sp_time.append(time.time() - start)
         sp_emb_dict = {w: sp_emb[i, :] for i, w in enumerate(self.dataset.words)}
-
+        sp_task_emb_dict = {}
+        for w in self.dataset.task_vocab:
+            if w in sp_emb_dict:
+                sp_task_emb_dict[w] = sp_emb_dict[w]
+            else:
+                sp_task_emb_dict[w] = self.dataset.task_emb_dict[w]
         self.embeddings = text_embeddings.PickleEmbedding()
-        self.embeddings.load_embeddings(sp_emb_dict, self.config['word_limit'], language='default',
+        self.embeddings.load_embeddings(sp_task_emb_dict, self.config['word_limit'], language='default',
                                         print_loading=True, skip_first_line=False,
                                         normalize=True)
 
@@ -183,13 +201,18 @@ class SpLightLSExperiments(LightLSExperiments):
     def run(self):
 
         # split text
-        Xs = self.split_lex_mturk()
+        Xs = self.split_lex_mturk(0.5)
 
         # optimize on the val data and test on the testing data
-        self.eval_data, self.eval_targets, self.eval_candidates = [x[0] for x in Xs]
+        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[0] for x in Xs]
 
         res = self.sp_minimize(self.config['sp_opt_space'], x0=self.config['sp_opt_x0'], n_calls=self.config['sp_n_calls'], verbose=True)
 
-        self.eval_data, self.eval_targets, self.eval_candidates = [x[1] for x in Xs]
-        print(f'test acc: {-self.sp_objective(res.x)}')
+        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[1] for x in Xs]
+        test_acc = -self.sp_objective(res.x)
+        print(f'test acc: {test_acc}')
         dump(res,'res-hyp.pickle',store_objective=False)
+        with open('sp_time.pickle','wb') as f,\
+             open('test_acc.pickle', 'wb') as f_acc:
+            pickle.dump(self.sp_time,f,pickle.HIGHEST_PROTOCOL)
+            pickle.dump(test_acc,f_acc,pickle.HIGHEST_PROTOCOL)

@@ -1,11 +1,12 @@
 import itertools
 import os
 import random
+import sys
 from collections import defaultdict
 from itertools import chain
 from os import path
 from os.path import join
-
+from nltk.corpus import wordnet as wn
 import numpy
 from scipy import linalg
 from six import iteritems
@@ -362,3 +363,27 @@ def load_syn_ant_classify(classification_fname):
     X = np.vstack(X)
     y = np.array(y, dtype=int)
     return Bunch(X=X.astype("object"), y=y)
+
+# decorater used to block function printing to the console
+# https://stackoverflow.com/a/52605530/
+def blockPrinting(func):
+    def func_wrapper(*args, **kwargs):
+        # block all printing to the console
+        sys.stdout = open(os.devnull, 'w')
+        # call the method in question
+        value = func(*args, **kwargs)
+        # enable all printing to the console
+        sys.stdout = sys.__stdout__
+        # pass the return value of the method back
+        return value
+
+    return func_wrapper
+
+# https://stackoverflow.com/a/35465203
+def penn2morphy(penntag):
+    morphy_tag = {'NN':wn.NOUN, 'JJ':wn.ADJ,
+                  'VB':wn.VERB, 'RB':wn.ADV}
+    try:
+        return morphy_tag[penntag[:2]]
+    except:
+        return wn.NOUN

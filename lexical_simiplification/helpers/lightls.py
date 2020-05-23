@@ -1,6 +1,10 @@
 import math
 import numpy as np
+from nltk import WordNetLemmatizer
+
 from lexical_simiplification.helpers import string_helper
+from utils import blockPrinting, penn2morphy
+
 
 class LightLS(object):
 	"""description of class"""
@@ -9,7 +13,7 @@ class LightLS(object):
 		self.params = parameters
 		self.embeddings = embeddings
 		self.lang = lang
-		
+		self.lemmatizer = WordNetLemmatizer()
 		self.complexities = {x : 1.0 / math.log2(word_freqs[x] + 2) for x in word_freqs }
 		max_freq = max(word_freqs.values())
 		min_freq = min(word_freqs.values())
@@ -56,16 +60,17 @@ class LightLS(object):
 		simplified_text = ' '.join(tokens_simple)
 		return (simplified_text, replacements)
 
-	def simplify_lex_mturk(self,sens,targets):
+	def simplify_lex_mturk(self,sens,targets,pos_tags):
 		simplifications = []
-		for sen,target in zip(sens,targets):
+		for sen,target,tag in zip(sens,targets,pos_tags):
 			try:
 				pos = sen.index(target)
 			except ValueError:
 				print(f'{target} not in {sen}')
 				# print(sen,target)
 				exit()
-			res = self.try_simplify_token(sen, pos)
+			tag = penn2morphy(tag)
+			res = self.try_simplify_token(sen, pos, tag)
 			simplifications.append(res)
 		return simplifications
 
@@ -79,7 +84,8 @@ class LightLS(object):
 				change += 1
 		return acc/len(simplifications),change/len(simplifications)
 
-	def try_simplify_token(self, tokens, index):
+	@blockPrinting
+	def try_simplify_token(self, tokens, index, pos_tag):
 		target = self.fix_token(tokens[index])
 		# Not simplifying proper names
 		# if str.isupper(target) or str.istitle(target) or str.isnumeric(target):
@@ -115,6 +121,9 @@ class LightLS(object):
 				# don't allow the target word to be replaced by a stopword
 				if self.stopwords is not None and c.lower() in self.stopwords:
 					continue
+				# lemma_target = self.lemmatizer.lemmatize(target, pos_tag)
+				# if self.lemmatizer.lemmatize(c, pos_tag) == lemma_target:
+				# 	continue
 
 				complexity_cand = self.complexities[c] if c in self.complexities else 1.0
 				if (complexity_cand < complexity_target) and ((complexity_target - complexity_cand) >= self.params["complexity_drop_threshold"]):
