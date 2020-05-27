@@ -2,6 +2,8 @@ from pathlib import Path
 
 from skopt import gp_minimize
 
+from lexical_simiplification.helpers import io_helper
+from lexical_simiplification.helpers.evaluate import LightLSEvaluator
 from lexical_simiplification.helpers.experiments import LightLSExperiments
 
 config = {
@@ -18,6 +20,10 @@ config = {
             'tholdcmplx': 0.0,
             'tholdsim': 0.0,
         }
-
-exp = LightLSExperiments(config)
+print("Loading unigram frequencies...")
+ls = io_helper.load_lines(config['fwordreqs'])
+wfs = {x.split()[0].strip(): int(x.split()[1].strip()) for x in ls}
+stopwords = io_helper.load_lines(config['fstopwords']) if config['fstopwords'] else None
+evaluator = LightLSEvaluator(wfs,stopwords)
+exp = LightLSExperiments(config,evaluator)
 exp.run()

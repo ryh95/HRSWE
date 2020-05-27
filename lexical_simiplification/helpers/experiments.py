@@ -18,14 +18,11 @@ from model import generate_syn_ant_graph
 
 class LightLSExperiments(object):
 
-    def __init__(self,config):
+    def __init__(self,config,evaluator):
 
         self.config = config
         # preparation
-
-        print("Loading unigram frequencies...")
-        ls = io_helper.load_lines(config['fwordreqs'])
-        self.wfs = {x.split()[0].strip(): int(x.split()[1].strip()) for x in ls}
+        self.evaluator = evaluator
 
         if config['fembs'].suffix == '.txt':
             self.embeddings = text_embeddings.Embeddings()
@@ -43,8 +40,6 @@ class LightLSExperiments(object):
                                             normalize=True)
             # self.embeddings.inverse_vocabularies()
 
-
-        self.stopwords = io_helper.load_lines(config['fstopwords']) if config['fstopwords'] else None
 
         with open(config['ftarget'], 'rb') as f_targets:
             self.targets = pickle.load(f_targets)
@@ -96,9 +91,8 @@ class LightLSExperiments(object):
         parameters = {"complexity_drop_threshold": feasible_point[2], "num_cand": feasible_point[0],
                       "similarity_threshold": self.config['tholdsim'], "context_window_size": feasible_point[1],
                       "complexity_threshold": self.config['tholdcmplx']}
-        simplifier = lightls.LightLS(self.embeddings, self.wfs, parameters, self.stopwords)
-        simplifications = simplifier.simplify_lex_mturk(self.eval_data, self.eval_targets, self.eval_pos_tags)
-        acc, change = simplifier.evaluate_lex_mturk_simplification(simplifications, self.eval_candidates)
+        acc = self.evaluator.evaluate_emb(self.embeddings,parameters)
+        self.evaluator.update_results()
         return -acc
 
     def run(self):
@@ -107,7 +101,7 @@ class LightLSExperiments(object):
         Xs = self.split_lex_mturk()
 
         # optimize on the val data and test on the testing data
-        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[0] for x in Xs]
+        self.evaluator.eval_data, self.evaluator.eval_targets, self.evaluator.eval_candidates, self.evaluator.eval_pos_tags = [x[0] for x in Xs]
         # lines = self.config['fdata'].read_text()
         # sens = [line.split() for line in lines.split('\n')[:-1]]
         # self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = sens,self.targets,self.candidates,self.pos_tags
@@ -117,20 +111,29 @@ class LightLSExperiments(object):
             Integer(2, 10),
             Real(10 ** -6, 10 ** -1,'log-uniform')
         ]
-        res = self.minimize(space, x0=x0, n_calls=50, verbose=True)
+        res = self.minimize(space, x0=x0, n_calls=80, verbose=True)
 
-        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[1] for x in Xs]
+        # check the res and the evaluator consistency
+        # print(res.x,res.fun)
+        # print(self.evaluator.best_parameters,self.evaluator.best_score)
+
+        # replace the eval data with the test data
+        self.evaluator.eval_data, self.evaluator.eval_targets, self.evaluator.eval_candidates, self.evaluator.eval_pos_tags = [x[1] for x in Xs]
         # print(f'data acc: {-res.fun}')
-        print(f'test acc: {-self.objective(res.x)}')
+        best_emb = self.evaluator.best_emb
+        best_parameters = self.evaluator.best_parameters
+        test_acc = self.evaluator.evaluate_emb(best_emb,best_parameters)
+        print(f'test acc: {test_acc}')
         dump(res,'res-hyp.pickle',store_objective=False)
 
 class SpLightLSExperiments(LightLSExperiments):
 
-    def __init__(self,sp_model,dataset,config):
+    def __init__(self,sp_model,dataset,config,evaluator):
         self.config = config
         self.sp_model = sp_model
         self.sp_time = []
         self.dataset = dataset
+        self.evaluator = evaluator
         if self.config['exp_name'] == 'hrswe':
             emb = [vec for vec in dataset.emb_dict.values()]
             emb = np.vstack(emb).astype(np.float32).T
@@ -159,12 +162,6 @@ class SpLightLSExperiments(LightLSExperiments):
         elif self.config['exp_name'] == 'ar':
             self.model_kws = {}
         # preparation
-
-        print("Loading unigram frequencies...")
-        ls = io_helper.load_lines(config['fwordreqs'])
-        self.wfs = {x.split()[0].strip(): int(x.split()[1].strip()) for x in ls}
-
-        self.stopwords = io_helper.load_lines(config['fstopwords']) if config['fstopwords'] else None
 
         with open(config['ftarget'], 'rb') as f_targets:
             self.targets = pickle.load(f_targets)
@@ -204,12 +201,16 @@ class SpLightLSExperiments(LightLSExperiments):
         Xs = self.split_lex_mturk(0.5)
 
         # optimize on the val data and test on the testing data
-        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[0] for x in Xs]
+        self.evaluator.eval_data, self.evaluator.eval_targets, self.evaluator.eval_candidates, self.evaluator.eval_pos_tags = [x[0] for x in Xs]
 
         res = self.sp_minimize(self.config['sp_opt_space'], x0=self.config['sp_opt_x0'], n_calls=self.config['sp_n_calls'], verbose=True)
 
-        self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = [x[1] for x in Xs]
-        test_acc = -self.sp_objective(res.x)
+        self.evaluator.eval_data, self.evaluator.eval_targets, self.evaluator.eval_candidates, self.evaluator.eval_pos_tags = [x[1] for x in Xs]
+
+        best_emb = self.evaluator.best_emb
+        best_parameters = self.evaluator.best_parameters
+        test_acc = self.evaluator.evaluate_emb(best_emb, best_parameters)
+
         print(f'test acc: {test_acc}')
         dump(res,'res-hyp.pickle',store_objective=False)
         with open('sp_time.pickle','wb') as f,\
