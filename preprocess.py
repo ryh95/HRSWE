@@ -165,13 +165,13 @@ class GeneralTextProcesser(object):
         elif oov_handle == 'none':
             print('%d words in vocab, %d words not found in word embedding file, ignore them in the embedding' % (
                 len_vocab, n_oov))
-            vocab_vec = vocab_vec[:, ~vocab_vec_ind]
         print('saving vocab vector file')
 
         if oov_handle != 'none':
             word2vec = OrderedDict((word, vocab_vec[:, id]) for id, word in enumerate(vocab))
         else:
             word2vec = OrderedDict((vocab[id], vocab_vec[:, id]) for id, flag in enumerate(vocab_vec_ind) if flag == False)
+            vocab_vec = vocab_vec[:, ~vocab_vec_ind]
 
         for fmt in savefmt:
             if fmt == 'mat':

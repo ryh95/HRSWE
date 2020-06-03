@@ -158,15 +158,24 @@ def generate_sub_thesauri(in_fthesauri, out_fthesauri, vocab):
         # with open(out_fthesauri, 'w') as f:
         #     f.writelines(' '.join(list(p)) + '\n' for p in ths)
 
-def get_all_words_in_constraint(word_sim_fname):
+def get_all_words_in_constraint(constrain_fname):
     vocab = set()
-    with open(word_sim_fname, 'r') as f:
+    with open(constrain_fname, 'r') as f:
         for line in f:
             word_pair = line.split()
             word_pair = [word[3:] for word in word_pair]  # remove the 'en-' prefix
             vocab.update(word_pair)
     return vocab
 
+def get_all_words_covered_in_constraint(constrain_fnames,vocab):
+    constrain_vocab = set()
+    for constrain_fname in constrain_fnames:
+        with open(constrain_fname, 'r') as f:
+            for line in f:
+                w1, w2 = line.strip().split()
+                if w1[3:] in vocab and w2[3:] in vocab:
+                    constrain_vocab.update([w1[3:],w2[3:]])
+    return constrain_vocab
 
 def generate_adv1(thesauri, po_ratio=0.5, reverse=False):
     '''

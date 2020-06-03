@@ -82,7 +82,7 @@ class LightLS(object):
 				acc += 1
 			if simplification is not None:
 				change += 1
-		return acc/len(simplifications),change/len(simplifications)
+		return acc/len(candidates),change/len(candidates)
 
 	@blockPrinting
 	def try_simplify_token(self, tokens, index, pos_tag):
@@ -111,19 +111,20 @@ class LightLS(object):
 			simpler_candidates = {}
 			for c in candidates:
 				# we discard candidates that are derivational morphological variations of the target word
-				if c in target or target in c:
-					continue
-				lcses = string_helper.longest_common_subsequence(c, target)
-				if len(lcses) > 0:
-					lcs = lcses.pop()
-					if len(target) >= 6 and len(c) >= 6 and len(lcs) >= (min(len(c), len(target)) - 3):
-						continue
-				# don't allow the target word to be replaced by a stopword
-				if self.stopwords is not None and c.lower() in self.stopwords:
-					continue
+				# if c in target or target in c:
+				# 	continue
+				# lcses = string_helper.longest_common_subsequence(c, target)
+				# if len(lcses) > 0:
+				# 	lcs = lcses.pop()
+				# 	if len(target) >= 6 and len(c) >= 6 and len(lcs) >= (min(len(c), len(target)) - 3):
+				# 		continue
+				# # don't allow the target word to be replaced by a stopword
+				# if self.stopwords is not None and c.lower() in self.stopwords:
+				# 	continue
 				# lemma_target = self.lemmatizer.lemmatize(target, pos_tag)
 				# if self.lemmatizer.lemmatize(c, pos_tag) == lemma_target:
 				# 	continue
+				if c == target: continue
 
 				complexity_cand = self.complexities[c] if c in self.complexities else 1.0
 				if (complexity_cand < complexity_target) and ((complexity_target - complexity_cand) >= self.params["complexity_drop_threshold"]):

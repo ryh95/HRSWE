@@ -60,8 +60,10 @@ class LightLSExperiments(object):
         fval = self.config['fdata'].parent / (fstem + '_val' + '.pickle')
         if not Path(fval).exists():
             print('prepare val test sentences')
-            lines = self.config['fdata'].read_text()
-            sens = [line.split() for line in lines.split('\n')[:-1]]
+            # lines = self.config['fdata'].read_text()
+            # sens = [line.split() for line in lines.split('\n')[:-1]]
+            with open(self.config['fdata'],'rb') as f:
+                sens = pickle.load(f)
             X_val, X_test, val_targets, test_targets, val_candidates, test_candidates, val_tags, test_tags = \
                 train_test_split(sens,self.targets,self.candidates,self.pos_tags, test_size=test_size)
             Xs = [[X_val,X_test],[val_targets,test_targets],[val_candidates,test_candidates],[val_tags,test_tags]]
@@ -135,7 +137,7 @@ class SpLightLSExperiments(LightLSExperiments):
         self.dataset = dataset
         self.evaluator = evaluator
         if self.config['exp_name'] == 'hrswe':
-            emb = [vec for vec in dataset.emb_dict.values()]
+            emb = [dataset.emb_dict[word] for word in dataset.words]
             emb = np.vstack(emb).astype(np.float32).T
 
             scaler = StandardScaler()
@@ -190,6 +192,8 @@ class SpLightLSExperiments(LightLSExperiments):
 
         res = self.minimize(self.config['ls_opt_space'], x0=self.config['ls_opt_x0'], n_calls=self.config['ls_n_calls'], verbose=False)
         return res.fun
+        # res = self.objective(self.config['ls_fixed_paras'])
+        # return res
 
     def sp_minimize(self, space, **min_args):
         minimizer = self.config['minimizer']
@@ -214,6 +218,8 @@ class SpLightLSExperiments(LightLSExperiments):
         print(f'test acc: {test_acc}')
         dump(res,'res-hyp.pickle',store_objective=False)
         with open('sp_time.pickle','wb') as f,\
-             open('test_acc.pickle', 'wb') as f_acc:
+             open('test_acc.pickle', 'wb') as f_acc, \
+             open('eval_hyp.pickle','wb') as f_eval:
             pickle.dump(self.sp_time,f,pickle.HIGHEST_PROTOCOL)
             pickle.dump(test_acc,f_acc,pickle.HIGHEST_PROTOCOL)
+            pickle.dump(best_parameters,f_eval,pickle.HIGHEST_PROTOCOL)
