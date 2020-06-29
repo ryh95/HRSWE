@@ -57,7 +57,8 @@ class LightLSExperiments(object):
         fdata: Path object
         """
         fstem = self.config['fdata'].stem
-        fval = self.config['fdata'].parent / (fstem + '_val' + '.pickle')
+        fval = self.config['fdata'].parent / str(self.config['exp_id']) / (fstem + '_val' + '.pickle')
+        # fval = self.config['fdata'].parent / (fstem + '_val' + '.pickle')
         if not Path(fval).exists():
             print('prepare val test sentences')
             # lines = self.config['fdata'].read_text()
@@ -82,7 +83,8 @@ class LightLSExperiments(object):
                 fstem = self.config[f].stem
                 stem = []
                 for j, type in enumerate(types):
-                    f_type = self.config[f].parent / (fstem + f'_{type}' + '.pickle')
+                    # f_type = self.config[f].parent / (fstem + f'_{type}' + '.pickle')
+                    f_type = self.config[f].parent / str(self.config['exp_id']) / (fstem + f'_{type}' + '.pickle') # use exp data of specific id
                     with open(f_type, 'rb') as handle:
                         stem.append(pickle.load(handle))
                 Xs.append(stem)
@@ -107,13 +109,13 @@ class LightLSExperiments(object):
         # lines = self.config['fdata'].read_text()
         # sens = [line.split() for line in lines.split('\n')[:-1]]
         # self.eval_data, self.eval_targets, self.eval_candidates, self.eval_pos_tags = sens,self.targets,self.candidates,self.pos_tags
-        x0 = [10,5,10**-4]
+        x0 = [10,5,0.03]
         space = [
             Integer(2, 50),
             Integer(2, 10),
             Real(10 ** -6, 10 ** -1,'log-uniform')
         ]
-        res = self.minimize(space, x0=x0, n_calls=80, verbose=True)
+        res = self.minimize(space, x0=x0, n_calls=40, verbose=True)
 
         # check the res and the evaluator consistency
         # print(res.x,res.fun)
@@ -125,6 +127,8 @@ class LightLSExperiments(object):
         best_emb = self.evaluator.best_emb
         best_parameters = self.evaluator.best_parameters
         test_acc = self.evaluator.evaluate_emb(best_emb,best_parameters)
+        with open('test_acc.pickle', 'wb') as f_acc:
+            pickle.dump(test_acc,f_acc,pickle.HIGHEST_PROTOCOL)
         print(f'test acc: {test_acc}')
         dump(res,'res-hyp.pickle',store_objective=False)
 

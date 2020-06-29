@@ -55,14 +55,16 @@ print("Loading unigram frequencies...")
 ls = io_helper.load_lines(config['fwordreqs'])
 wfs = {x.split()[0].strip(): int(x.split()[1].strip()) for x in ls}
 stopwords = io_helper.load_lines(config['fstopwords']) if config['fstopwords'] else None
-for i in range(5):
+for i in range(3):
     data_dir = Path('task_data') / str(i)
     data_dir.mkdir(parents=True, exist_ok=True)
     res_dir = Path(str(i))
     res_dir.mkdir(parents=True, exist_ok=True)
+    # config['exp_id'] = i # create id of the val, test data and exp
     for j in range(3):
         for exp_name in ['hrswe','ar']:
             config['exp_name'] = exp_name
+            # exp_res_dir = Path(exp_name+'_'+str(j)+'_'+'2') # hrswe-2
             exp_res_dir = Path(exp_name+'_'+str(j))
             exp_res_dir.mkdir(parents=True, exist_ok=True)
 
@@ -115,6 +117,7 @@ for i in range(5):
 
     for k in range(3):
         for exp_name in ['hrswe', 'ar']:
+            # exp_res_dir = Path(exp_name + '_' + str(k)+'_'+'2') # hrswe-2
             exp_res_dir = Path(exp_name + '_' + str(k))
             exp_res_dir.rename(res_dir / exp_res_dir)
 

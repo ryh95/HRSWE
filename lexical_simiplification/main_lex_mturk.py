@@ -7,7 +7,7 @@ from lexical_simiplification.helpers.evaluate import LightLSEvaluator
 from lexical_simiplification.helpers.experiments import LightLSExperiments
 
 config = {
-            'fdata': Path('task_data/lex_mturk_sen.txt'),
+            'fdata': Path('task_data/lex_mturk_sen.pickle'),
             'ftarget': Path('task_data/targets.pickle'),
             'fcandidates': Path('task_data/candidates.pickle'),
             'ftags': Path('task_data/pos_tags.pickle'),
@@ -24,6 +24,10 @@ print("Loading unigram frequencies...")
 ls = io_helper.load_lines(config['fwordreqs'])
 wfs = {x.split()[0].strip(): int(x.split()[1].strip()) for x in ls}
 stopwords = io_helper.load_lines(config['fstopwords']) if config['fstopwords'] else None
-evaluator = LightLSEvaluator(wfs,stopwords)
-exp = LightLSExperiments(config,evaluator)
-exp.run()
+for i in range(3):
+    config['exp_id'] = i
+    evaluator = LightLSEvaluator(wfs,stopwords)
+    exp = LightLSExperiments(config,evaluator)
+    exp.run()
+    Path('res-hyp.pickle').rename(Path(str(i)) / 'res-hyp.pickle')
+    Path('test_acc.pickle').rename(Path(str(i)) / 'test_acc.pickle')
