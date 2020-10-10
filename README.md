@@ -5,7 +5,7 @@ This is the repository that contains the code of "Specializing Word Vectors by S
 TODO:
 
 - [ ] add the paper link
-- [ ] add the paper introduction video
+- [ ] add the introduction video of the paper
 - [ ] add the bib file 
 
 ## Supplementary Materials
