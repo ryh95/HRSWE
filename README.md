@@ -18,7 +18,7 @@ Lexical Simplification task
 0. Download the [data](https://www.dropbox.com/s/q66b1j8f0fuodsx/data.zip?dl=0)
 1. Open `results` in `lexical_simiplification` directory and load `res-hyp.pickle` with `skopt` module
 2. Change hrswe/ar config in `main_sp_lex_mturk.py` with `config` in `res-hyp.pickle`
-3. run `main_sp_lex_mturk.py`
+3. Run `main_sp_lex_mturk.py`
 
 Note: Due to the randomness in the hyperparameter tuning method, you may not produce the exact same results. But you should obtain similar results.
 
